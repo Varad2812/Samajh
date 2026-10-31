@@ -424,3 +424,4 @@ Format:
 - **Deviations:**
   - The landing lives inside the app shell, with the side nav and top bar kept for navigation, rather than a separate chrome-less page.
   - The live Claude path is still untested without a key.
+- **Deployed:** https://samajh-silk.vercel.app. This is a temporary Vercel deployment made without logging in (the CLI was logged out). `/`, `/student` and `/teacher` return 200, and the AI routes answer through their offline fallback (`no-key`). To own the project and add `ANTHROPIC_API_KEY`: `vercel login`, then `vercel --prod`.

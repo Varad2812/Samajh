@@ -69,6 +69,8 @@ There's no database and no auth: all state lives in the browser. Time comes from
 
 ## Deploy (Vercel)
 
+Live (temporary deployment): https://samajh-silk.vercel.app
+
 ```bash
 npx vercel login
 npx vercel --prod
