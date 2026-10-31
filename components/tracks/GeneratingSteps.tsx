@@ -12,7 +12,7 @@ const STEPS = [
   { at: 28, label: "Putting your test together" },
 ];
 
-/** Shown while the test is being written (usually 15-40 s). Steps advance on a timer; the last one waits for the reply. */
+/** Shown while the test is being written (usually 15-60 s). Steps advance on a timer; the last one waits for the reply. */
 export function GeneratingSteps({ subject, standard, count }: { subject: string; standard: string; count: number }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -40,7 +40,7 @@ export function GeneratingSteps({ subject, standard, count }: { subject: string;
           </li>
         ))}
       </ol>
-      <p className="font-mono text-xs text-muted-foreground tabular">{Math.floor(elapsed)} s · usually 15–40 s</p>
+      <p className="font-mono text-xs text-muted-foreground tabular">{Math.floor(elapsed)} s · usually 15–60 s</p>
     </div>
   );
 }
