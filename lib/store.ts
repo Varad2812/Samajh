@@ -5,11 +5,13 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { addDays, now as virtualNow, startOfDay } from "@/lib/clock";
 import { CONCEPTS } from "@/lib/data/concepts";
+import { BKT_DEFAULTS } from "@/lib/engine/bkt";
+import { INITIAL_THETA } from "@/lib/engine/elo";
 import { DEMO_STUDENT_ID, generateClass, generateDemoStudent } from "@/lib/data/students";
 import type { Attempt, ConceptMastery, ReviewItem, StudentRecord } from "@/lib/types";
 
-export const DEFAULT_P_INIT = 0.3;
-export const DEFAULT_THETA = 1100;
+export const DEFAULT_P_INIT = BKT_DEFAULTS.pInit;
+export const DEFAULT_THETA = INITIAL_THETA;
 
 export type Role = "student" | "teacher";
 
@@ -144,10 +146,4 @@ export function useClassRoster(): StudentRecord[] | null {
   return useMemo(() => (day === null ? null : generateClass(day)), [day]);
 }
 
-/** Concepts whose SM-2 review is due at the virtual time. */
-export function dueConceptIds(schedule: Record<string, ReviewItem>, at: number): string[] {
-  return Object.entries(schedule)
-    .filter(([, item]) => item.due <= at)
-    .sort(([, a], [, b]) => a.due - b.due)
-    .map(([id]) => id);
-}
+export { dueConceptIds } from "@/lib/engine/sm2";

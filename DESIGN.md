@@ -194,3 +194,22 @@ Format:
   - The teacher roster shows the 30 synthetic students; Aarav joins as #31 in phase 6. OfflineChip is hidden until an AI fallback actually fires.
 - Seed data: 34 concepts (acyclic DAG), 17 misconceptions, and 84 MCQs (difficulty mix 14/25/26/14/5; every weight-3 concept has ≥ 3; all 17 misconceptions are wired to distractors). The class of 30 is mulberry32 seed 42: MC01 40%, MC03 30%, MC13 27%, Electricity weakest (.34 vs .50–.56), 11–39 attempts each.
 - Known issues / next: no `npm run test` yet (vitest arrives with the engine in phase 2). 390px layout was checked by reasoning about the breakpoints, not by screenshot. Next: phase 2 engine.
+
+### Phase 2 — Engine — 2026-10-31
+- Screens touched: none visually. The Review badge and review table now use the engine's `dueConceptIds`, and the store's `pInit`/θ defaults come from the engine constants.
+- What changed (UI/UX): no UI changes. New pure-TS modules in `lib/engine/`:
+  - `confidence.ts`: §5.1 baseline from self-correction, hedge and filler markers, the AI blend, and human-readable reasons for the meter.
+  - `bkt.ts`: posterior, confidence weighting, the arithmetic-slip half weight, `applyAttempt` (with history), and `inferUntested` for diagnostic estimates (§4.1).
+  - `rootCause.ts`: prereq propagation, plus a root-cause path traced down the DAG.
+  - `elo.ts`: expected score, the update rule, and target d = θ − 147.
+  - `sm2.ts`: quality mapping, EF, 1/6/round(I·EF) intervals, and the due queue.
+  - `selector.ts`: priority order due → root cause → weakest × weight → unexplored; ±150 Elo window; no repeats within 5 attempts; prefers misconception-targeting distractors; flags `needsGeneration`.
+  - `mathEval.ts`: math.js with log₁₀ and ln, reading auto-pick within 2%, equivalence by evaluation, and LaTeX → math.js for MathLive edits.
+  - 77 vitest tests across 7 files cover every formula, the §5.5 examples (10.477 / 9.937 / 81) and fast-forward scheduling.
+- Deviations from spec + why:
+  - "wait no" was added to the self-correction markers alongside "no wait". With it, the §8 demo transcript scores 3 self-corrections, 2 hedges and 1 filler, giving a baseline of 0.376 ≈ the scripted 0.38. (The script's "2 self-corrections" wording would give 0.53 offline; the AI count may differ.)
+  - A sound correct answer clears a concept's `suspect` flag.
+  - The selector only picks "weakest" for explored concepts below .60. Otherwise it moves to the unexplored frontier, preferring heavy concepts whose prereqs are explored.
+  - Added a "requested" reason for `practice?concept=ID`.
+  - `@types/node` was bumped 20 → 24 (vitest 5 peer requirement; the runtime is Node 24).
+- Known issues / next: the engine is not yet wired into the flows (phase 5). Next: phase 3 Knowledge Galaxy.
