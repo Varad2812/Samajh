@@ -213,3 +213,26 @@ Format:
   - Added a "requested" reason for `practice?concept=ID`.
   - `@types/node` was bumped 20 → 24 (vitest 5 peer requirement; the runtime is Node 24).
 - Known issues / next: the engine is not yet wired into the flows (phase 5). Next: phase 3 Knowledge Galaxy.
+
+### Phase 3 — Knowledge Galaxy — 2026-10-31
+- Screens touched: `/student` (full §3.2 layout), `/student/practice` (MiniGalaxy panel).
+- What changed (UI/UX):
+  - Galaxy layout: a 3D galaxy (R3F + drei + postprocessing). Four chapter constellations sit on a 16°-tilted ring, each laid out by a seeded force layout (`lib/galaxy/layout.ts`) with prerequisite roots near the core and dependents further out, chapter nebula glows and floating cluster labels.
+  - Nodes: size 0.18 + 0.08·weight, emissive colour from `masteryColor` (intensity 1.2–2.5). Estimated nodes are `--unknown` with a dashed billboard ring. Weak nodes (< .4) pulse every 1.6s, due reviews get a rotating `--accent` halo, and each active misconception adds an orbiting violet satellite. Mastery changes lerp the colour (~600ms) and fire a shockwave ring.
+  - Edges: prerequisite lines in one draw call, plus 2 instanced particles per edge flowing toward the dependent, coloured by the prerequisite's mastery. Edges touching the selected node brighten.
+  - Background and post: drei Stars, Bloom (threshold .2, intensity .9, mipmap blur) and Vignette.
+  - Interaction:
+    - Orbit with damping; slow auto-rotate after 3s idle.
+    - Hover scales the node 1.15× and shows a label.
+    - Clicking a node, a sheet chip, a plan row or a search result flies the camera there (800ms ease, orbit disabled mid-flight) and opens the side sheet. The projection shifts so the node stays clear of the sheet.
+    - "Overview" flies back home; Esc closes the sheet.
+  - Side sheet: id and chapter, a big mastery number with band, a history sparkline, the summary, "Root cause: likely …", clickable prerequisite/unlocks chips, linked misconceptions (active ones highlighted), next review / interval / EF, and "Practice this".
+  - Student home: galaxy (~62%) with chapter + mastery legends and search, and a stats row (accuracy and confidence sparklines, attempts, streak, misconceptions). The right column holds Today's Plan (due reviews, weighted focus, root-cause pairs and the engine's "Next up" pick), Chapter mastery with 21-day trend sparklines and deltas, Active misconceptions (wrong → correct), and Recent attempts.
+  - MiniGalaxy: the same scene with the camera locked on the focus node and its 1-hop neighbours, everything else dimmed, and no controls. It switches to `frameloop="demand"` 4s after the last change unless hovered.
+  - The canvas loading state is a CSS shimmering starfield; `prefers-reduced-motion` stops rotation, pulses and particle flow and makes camera moves instant.
+- Deviations from spec + why:
+  - Canvases are `KnowledgeGalaxyCanvas.tsx` / `MiniGalaxyCanvas.tsx`, lazy-loaded through `components/galaxy/index.tsx` (`ssr: false`) instead of `KnowledgeGalaxy.tsx` / `MiniGalaxy.tsx`. Shared scene, camera and Starfield components are split out to stay under 250 lines.
+  - Edges are straight lines; curved, dash-shaded edges are part of §4.1 (phase 3B).
+  - three is pinned to `~0.186` because postprocessing 6.39 requires three < 0.187.
+- Verified: real Edge on the Intel UHD iGPU (D3D11) at 1440×900. 144 fps in every state (display cap) with p95 frame 7.1ms; worst single frame 21ms during fly-to. Clicking a node at the screen centre opens its sheet, search fly-to and chip navigation work, 390px has no horizontal overflow, and there are no console errors. 6 new layout tests (83 total).
+- Known issues / next: `THREE.Clock` deprecation warning comes from inside R3F (harmless). The practice page below the question is still sparse until phase 5 adds reasoning input + analysis. Streak reads 0d for the demo profile because its seeded attempts aren't on consecutive recent days. Next: phase 3B wow pack.

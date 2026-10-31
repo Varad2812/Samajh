@@ -1,13 +1,15 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MiniGalaxy } from "@/components/galaxy";
 import { QuestionCard } from "@/components/practice/QuestionCard";
+import { buildGalaxyNodes } from "@/lib/galaxy/nodes";
 import { CONCEPT_BY_ID, CONCEPTS } from "@/lib/data/concepts";
 import { misconceptionsFor } from "@/lib/data/misconceptions";
 import { questionsFor, type OptionIndex } from "@/lib/data/questions";
-import { useStore } from "@/lib/store";
+import { useStore, useVirtualNow } from "@/lib/store";
 import { cn, fmt2, masteryColor } from "@/lib/utils";
 
 export default function PracticePage() {
@@ -25,11 +27,17 @@ function Practice() {
   const questions = questionsFor(conceptId);
   const [qIndex, setQIndex] = useState(0);
   const [selected, setSelected] = useState<OptionIndex | null>(null);
-  const mastery = useStore((s) => s.mastery[conceptId]);
+  const allMastery = useStore((s) => s.mastery);
+  const schedule = useStore((s) => s.schedule);
+  const activeMcs = useStore((s) => s.student.misconceptions);
+  const at = useVirtualNow();
+  const router = useRouter();
+  const nodes = useMemo(() => buildGalaxyNodes(allMastery, schedule, activeMcs, at), [allMastery, schedule, activeMcs, at]);
+  const mastery = allMastery[conceptId];
   const question = questions[qIndex % questions.length];
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="panel flex flex-col gap-4 p-4">
         <QuestionCard key={question.id} question={question} selected={selected} onSelect={setSelected} />
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
@@ -50,6 +58,10 @@ function Practice() {
       </section>
 
       <aside className="flex flex-col gap-4">
+        <section className="panel relative h-56 overflow-hidden" aria-label={`Mini galaxy focused on ${concept.id}`}>
+          <MiniGalaxy nodes={nodes} focusId={conceptId} onSelect={(id) => router.push(`/student/practice?concept=${id}`)} />
+          <span className="label-caps pointer-events-none absolute top-3 left-3">Mini galaxy · {concept.id}</span>
+        </section>
         <section className="panel p-4">
           <h2 className="label-caps mb-2">Mastery · {concept.id}</h2>
           <div className="font-mono text-title tabular" style={{ color: masteryColor(mastery.estimated ? null : mastery.p) }}>
