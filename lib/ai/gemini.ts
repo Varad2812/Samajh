@@ -1,13 +1,20 @@
 /**
- * Server-only Gemini wrapper: strict JSON validated by zod, timeout, one retry. The first attempt uses Google
- * Search grounding so suggested videos are real; the retry drops grounding and asks for JSON mode.
+ * Server-only Gemini wrapper: strict JSON validated by zod, with timeouts. The first attempt uses Google Search
+ * grounding so suggested videos are real; then plain JSON mode on the main model, then on a fast lite model.
  */
 import type { z } from "zod";
 import { extractJson, type AiResult } from "./client";
 
 export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
-const GROUNDED_TIMEOUT_MS = 20_000;
-const PLAIN_TIMEOUT_MS = 12_000;
+// Gemini 3 models think before answering; grounded search adds more. Both regularly exceed the 8 s Claude budget.
+const GROUNDED_TIMEOUT_MS = 40_000;
+const PLAIN_TIMEOUT_MS = 30_000;
+const LITE_TIMEOUT_MS = 15_000;
+/** Backup when the main model is overloaded (503) or rate-limited (429). */
+const LITE_MODEL = "gemini-flash-lite-latest";
+/** Free keys often have no grounding quota: after a 429, skip grounding for a while instead of paying for it every call. */
+const GROUNDING_COOLDOWN_MS = 10 * 60_000;
+let groundingBlockedUntil = 0;
 
 export const hasGeminiKey = (): boolean => Boolean(process.env.GEMINI_API_KEY?.trim());
 
@@ -15,7 +22,16 @@ interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 }
 
-async function attempt<S extends z.ZodType>(system: string, user: string, schema: S, grounded: boolean): Promise<AiResult<z.output<S>>> {
+interface AttemptOptions {
+  model: string;
+  grounded: boolean;
+  timeoutMs: number;
+  /** Lower thinking for Gemini 3 models (the lite alias may not accept it). */
+  lowThinking: boolean;
+}
+
+async function attempt<S extends z.ZodType>(system: string, user: string, schema: S, o: AttemptOptions): Promise<AiResult<z.output<S>>> {
+  const { grounded } = o;
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) return { ok: false, reason: "no-key" };
   const body = {
@@ -23,14 +39,19 @@ async function attempt<S extends z.ZodType>(system: string, user: string, schema
     contents: [{ role: "user", parts: [{ text: user }] }],
     // JSON mode cannot be combined with tools, so the grounded call parses JSON out of the text.
     ...(grounded ? { tools: [{ google_search: {} }] } : {}),
-    generationConfig: { temperature: 0.4, ...(grounded ? {} : { responseMimeType: "application/json" }) },
+    generationConfig: {
+      temperature: 0.4,
+      // Picking videos needs little reasoning; default (high) thinking blows the time budget.
+      ...(o.lowThinking ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
+      ...(grounded ? {} : { responseMimeType: "application/json" }),
+    },
   };
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${o.model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(grounded ? GROUNDED_TIMEOUT_MS : PLAIN_TIMEOUT_MS),
+      signal: AbortSignal.timeout(o.timeoutMs),
     });
     if (!res.ok) return { ok: false, reason: `api-error:${res.status}` };
     const json = (await res.json()) as GeminiResponse;
@@ -48,11 +69,23 @@ async function attempt<S extends z.ZodType>(system: string, user: string, schema
   }
 }
 
-/** Grounded call, then one plain JSON-mode retry. Never throws. */
+/** Grounded call, then plain JSON mode, then the lite model. Never throws; `reason` lists every failure. */
 export async function callGeminiJson<S extends z.ZodType>(system: string, user: string, schema: S): Promise<AiResult<z.output<S>>> {
   if (!hasGeminiKey()) return { ok: false, reason: "no-key" };
-  const first = await attempt(system, user, schema, true);
-  return first.ok ? first : attempt(system, user, schema, false);
+  const failures: string[] = [];
+  if (Date.now() >= groundingBlockedUntil) {
+    const r = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: true, timeoutMs: GROUNDED_TIMEOUT_MS, lowThinking: true });
+    if (r.ok) return r;
+    if (r.reason === "api-error:429") groundingBlockedUntil = Date.now() + GROUNDING_COOLDOWN_MS;
+    failures.push(`grounded:${r.reason}`);
+  }
+  const plain = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: false, timeoutMs: PLAIN_TIMEOUT_MS, lowThinking: true });
+  if (plain.ok) return plain;
+  failures.push(`plain:${plain.reason}`);
+  const lite = await attempt(system, user, schema, { model: LITE_MODEL, grounded: false, timeoutMs: LITE_TIMEOUT_MS, lowThinking: false });
+  if (lite.ok) return lite;
+  failures.push(`lite:${lite.reason}`);
+  return { ok: false, reason: failures.join(",") };
 }
 
 interface OEmbed {

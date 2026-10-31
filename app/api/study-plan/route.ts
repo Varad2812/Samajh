@@ -48,4 +48,7 @@ async function run(req: StudyPlanRequest): Promise<AiEnvelope<StudyPlan>> {
   return env;
 }
 
+// Grounded attempt + retry + link checks can take over a minute.
+export const maxDuration = 90;
+
 export const POST = aiRoute(studyPlanRequestSchema, run);

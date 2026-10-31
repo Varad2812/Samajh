@@ -51,6 +51,6 @@ export const remedialWorksheet = (req: WorksheetRequest) =>
 
 /** Grounded search plus link checks can take a while, so this one gets a longer client timeout. */
 export const studyPlan = (req: StudyPlanRequest) =>
-  post<StudyPlan>("/api/study-plan", req, () => offlinePlan(req, Date.now()), 60_000);
+  post<StudyPlan>("/api/study-plan", req, () => offlinePlan(req, Date.now()), 100_000);
 
 export const ai = { analyzeReasoning, generateQuestion, remedialWorksheet, studyPlan };
