@@ -354,3 +354,29 @@ Format:
   - The live Claude path is still untested without a key.
   - "See it in 3D" on misconception cards arrives in phase 6B.
   - Next: phase 6, Teacher.
+
+### Phase 6 — Teacher Class X-ray — 2026-10-31
+- Screens touched: Teacher (`/teacher`, rebuilt). Small fixes to the MiniGalaxy.
+- What changed (UI/UX)
+  - **KPI strip:** class mastery with a 21-day sparkline and Δ vs 7 days ago, students at risk (< .40), top misconception (click → filters the heatmap), reviews overdue with how many students they span.
+  - **Mastery heatmap:** 31 students × 34 concepts, grouped by chapter with chapter-coloured group headers and a sticky name column and header.
+    - Sorting: a dropdown (weakest first, name, most misconceptions, weakest per chapter), plus clicking any concept ID or chapter header sorts by it.
+    - A single shared hover tooltip (student, concept, mastery and band, last attempt, active misconception) keeps ~1,000 cells cheap. Rows are memoised.
+    - Estimated cells render dimmed; the legend shows the weak → mastered gradient.
+    - Clicking a row opens the student drawer.
+  - **Misconception leaderboard:** ranked bars with % and count. Clicking one filters the heatmap: holders move to the top, the rest dim, and that misconception's concept column is outlined, with a banner and "Clear". It also filters from the KPI tile and from the weakest-concepts chips.
+  - **Weakest concepts:** the 8 lowest by class mean, each with students below .40, the likely root-cause prerequisite (the engine's `rootCauseOf` run on the class-mean model), the misconceptions held there and a "Worksheet" button. Hovering highlights the concept's heatmap column.
+  - **Student drawer** (side sheet; Esc or ✕ closes): stats tiles, a MiniGalaxy focused on their weakest concept (clickable; chips re-focus it), the root cause for the focused concept, chapter bars, misconception cards, and recent attempts.
+  - **Remedial worksheet dialog:** prefilled from the concept, the misconceptions present and the class stats; it calls `/api/remedial-worksheet`. It shows a 3-step loading state, a light-theme printable layout (title, name/date line, lettered sections, answer key toggle, teacher notes) and a **Print** button (`window.print()`). `@media print` hides everything except the sheet. A note says whether it was written by Claude or assembled from the seeded bank, and the top-bar offline chip lights up on fallback.
+  - Also: class chapter bars with "n students below .40".
+- Data: the 30 synthetic students plus the live student (Aarav, from the store) make the 31 rows. Aarav's practice shows up here immediately. Before a diagnostic or demo profile, his row is all "estimated". All aggregates are in `lib/teacher/stats.ts`, with 5 tests (planted MC01 12/30, MC03 9/30, MC13 8/30; Electricity weakest; class-level root causes; KPIs and fast-forward effect; sorts and filter).
+- Deviations from spec + why:
+  - Plain HTML bars are used for the leaderboard, instead of recharts (not installed).
+  - Dialog and drawer use `@base-ui/react` Dialog via a small `components/ui/dialog.tsx`.
+  - The MiniGalaxy no longer renders DOM labels. drei `<Html>` threw `removeChild` when a whole canvas unmounted (closing the drawer). Labels remain in the full galaxy.
+- Verified (real Edge, production build, no API key): 31 rows × 34 cells; sort by weakest / name / concept C6; MC01 filter shows 12 bright + 19 dimmed and clears; tooltip; drawer with a WebGL mini galaxy opens and closes on Esc; worksheet opens from the weakest concept (offline fallback, chip on), print emulation hides the top bar and no-print controls, and a PDF was produced; no horizontal scroll at 390px; no console errors. 152 tests, lint and build clean.
+- Known issues / next:
+  - Reviews overdue reads 486 (≈16 per student). That is the seeded SM-2 data, higher than the spec's illustrative "52"; tune the seed if it looks implausible.
+  - The 31st row (Aarav) is dark until a profile is loaded (⇧D).
+  - The live Claude worksheet path is untested without a key.
+  - Next: phase 6B (Misconception Lab + Class Constellation) or 7 (polish).

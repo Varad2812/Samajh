@@ -63,13 +63,14 @@ export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedM
           selected={selectedId === c.id}
           dimmed={visibleIds !== null && !visibleIds.has(c.id)}
           reducedMotion={reducedMotion}
+          compact={compact}
           boostAt={boostAt[c.id]}
           satelliteAt={satelliteAt[c.id]}
           onSelect={onSelect}
         />
       ))}
       {!compact && <ClusterLabels hidden={igniting} />}
-      <SelectedLabel id={selectedId} data={selectedId ? nodes[selectedId] : null} />
+      {!compact && <SelectedLabel id={selectedId} data={selectedId ? nodes[selectedId] : null} />}
       <FxLayer events={events} reducedMotion={reducedMotion} />
       <PostStack />
     </>

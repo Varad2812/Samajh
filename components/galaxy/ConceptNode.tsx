@@ -21,6 +21,8 @@ interface Props {
   selected: boolean;
   dimmed: boolean;
   reducedMotion: boolean;
+  /** MiniGalaxy: no DOM labels (drei Html portals throw removeChild when the whole canvas unmounts, e.g. a closing drawer). */
+  compact?: boolean;
   /** Date.now() of a nearby shockwave → brief brightening (prerequisite "unlock" feel). */
   boostAt?: number;
   /** Date.now() at which the newest satellite appears (Misconception Strike impact). */
@@ -34,7 +36,7 @@ const DASHED_RING = Array.from({ length: 65 }, (_, i) => {
   return new THREE.Vector3(Math.cos(a), Math.sin(a), 0);
 });
 
-export function ConceptNode({ concept, position, data, selected, dimmed, reducedMotion, boostAt, satelliteAt, onSelect }: Props) {
+export function ConceptNode({ concept, position, data, selected, dimmed, reducedMotion, compact = false, boostAt, satelliteAt, onSelect }: Props) {
   const r = nodeRadius(concept.weight);
   const signals = useSignals();
   const reveal = useRef<THREE.Group>(null);
@@ -164,7 +166,7 @@ export function ConceptNode({ concept, position, data, selected, dimmed, reduced
       </group>
 
       {/* The selected node's label is the scene-level SelectedLabel (always mounted: no Html portal churn). */}
-      {hovered && !selected && (
+      {hovered && !selected && !compact && (
         <Html position={[0, r + 0.32, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
           <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface/90 px-2 py-1 text-xs whitespace-nowrap shadow-highlight backdrop-blur">
             <span className="font-mono text-muted-foreground">{concept.id}</span>

@@ -1,102 +1,98 @@
 "use client";
 
-import { MasteryBar } from "@/components/shared/MasteryBar";
-import { CHAPTERS, CONCEPTS } from "@/lib/data/concepts";
-import { MISCONCEPTIONS } from "@/lib/data/misconceptions";
-import { dueConceptIds, useClassRoster, useVirtualNow } from "@/lib/store";
-import { fmt2, masteryColor, pct } from "@/lib/utils";
+import { useMemo, useState } from "react";
+import { KpiStrip } from "@/components/teacher/KpiStrip";
+import { MasteryHeatmap } from "@/components/teacher/MasteryHeatmap";
+import { MisconceptionChart } from "@/components/teacher/MisconceptionChart";
+import { StudentDrawer } from "@/components/teacher/StudentDrawer";
+import { WeakestConcepts } from "@/components/teacher/WeakestConcepts";
+import { WorksheetDialog } from "@/components/teacher/WorksheetDialog";
+import { ChapterMasteryBars } from "@/components/teacher/ChapterMasteryBars";
+import type { WorksheetRequest } from "@/lib/ai/schemas";
+import { TEACHER_NAME } from "@/lib/data/students";
+import { classTrend, kpis as computeKpis, misconceptionStats, studentMean, weakestConcepts, type WeakConcept } from "@/lib/teacher/stats";
+import { useClassRoster, useHydrated, useStore, useVirtualNow } from "@/lib/store";
 import type { StudentRecord } from "@/lib/types";
 
-const meanMastery = (s: StudentRecord) => CONCEPTS.reduce((acc, c) => acc + s.mastery[c.id].p, 0) / CONCEPTS.length;
-
 export default function TeacherPage() {
-  const roster = useClassRoster();
+  const hydrated = useHydrated();
+  const classRoster = useClassRoster();
   const at = useVirtualNow();
+  if (!hydrated || !classRoster || at === null) return <TeacherSkeleton />;
+  return <ClassXray classRoster={classRoster} at={at} />;
+}
 
-  if (!roster || at === null) return <div className="panel h-[480px] animate-pulse" />;
-
-  const classMean = roster.reduce((s, st) => s + meanMastery(st), 0) / roster.length;
-  const atRisk = roster.filter((s) => meanMastery(s) < 0.4).length;
-  const overdue = roster.reduce((s, st) => s + dueConceptIds(st.schedule, at).length, 0);
-  const mcRates = MISCONCEPTIONS.map((m) => ({ m, rate: roster.filter((s) => s.misconceptions.includes(m.id)).length / roster.length }))
-    .sort((a, b) => b.rate - a.rate);
-  const top = mcRates[0];
-
+function TeacherSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <section className="panel grid grid-cols-2 gap-4 p-4 lg:grid-cols-4">
-        <Kpi label="Class mean mastery" value={fmt2(classMean)} color={masteryColor(classMean)} />
-        <Kpi label="Students at risk (< .40)" value={`${atRisk}/${roster.length}`} color="var(--weak)" />
-        <Kpi label="Top misconception" value={`${top.m.id} (${pct(top.rate)})`} color="var(--misconception)" />
-        <Kpi label="Reviews overdue" value={String(overdue)} color="var(--developing)" />
-      </section>
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <section className="panel overflow-x-auto p-4">
-          <h2 className="label-caps mb-3">Roster · {roster.length} students</h2>
-          <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground">
-                <th className="py-1.5 font-medium">Student</th>
-                <th className="py-1.5 font-medium">Profile</th>
-                {CHAPTERS.map((ch) => <th key={ch.id} className="py-1.5 font-medium">{ch.short}</th>)}
-                <th className="py-1.5 font-medium">Attempts</th>
-                <th className="py-1.5 font-medium">MCs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.map((s) => (
-                <tr key={s.id} className="border-t border-border/60 hover:bg-surface-2">
-                  <td className="py-1.5">{s.name}</td>
-                  <td className="py-1.5 text-xs text-muted-foreground">{s.profile}</td>
-                  {CHAPTERS.map((ch) => {
-                    const cs = CONCEPTS.filter((c) => c.chapter === ch.id);
-                    const m = cs.reduce((acc, c) => acc + s.mastery[c.id].p, 0) / cs.length;
-                    return <td key={ch.id} className="py-1.5 font-mono text-xs tabular" style={{ color: masteryColor(m) }}>{fmt2(m)}</td>;
-                  })}
-                  <td className="py-1.5 font-mono text-xs tabular">{s.attempts.length}</td>
-                  <td className="py-1.5 font-mono text-xs text-misconception">{s.misconceptions.join(" ")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-        <aside className="flex flex-col gap-4">
-          <section className="panel p-4">
-            <h2 className="label-caps mb-3">Chapter mastery (class)</h2>
-            <div className="flex flex-col gap-2.5">
-              {CHAPTERS.map((ch) => {
-                const cs = CONCEPTS.filter((c) => c.chapter === ch.id);
-                const m = roster.reduce((acc, s) => acc + cs.reduce((a, c) => a + s.mastery[c.id].p, 0) / cs.length, 0) / roster.length;
-                return <MasteryBar key={ch.id} label={ch.short} value={m} />;
-              })}
-            </div>
-          </section>
-          <section className="panel p-4">
-            <h2 className="label-caps mb-3">Misconception prevalence</h2>
-            <ul className="flex flex-col gap-2">
-              {mcRates.filter((r) => r.rate > 0).map(({ m, rate }) => (
-                <li key={m.id} className="flex items-center gap-2 text-xs">
-                  <span className="w-10 font-mono text-misconception">{m.id}</span>
-                  <span className="w-36 truncate text-muted-foreground">{m.label}</span>
-                  <span className="h-1.5 flex-1 rounded-full bg-surface-2">
-                    <span className="block h-full rounded-full bg-misconception" style={{ width: pct(rate) }} />
-                  </span>
-                  <span className="w-9 text-right font-mono tabular">{pct(rate)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </aside>
+      <div className="panel h-24 animate-pulse" />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="panel h-[560px] animate-pulse" />
+        <div className="flex flex-col gap-4">
+          <div className="panel h-64 animate-pulse" />
+          <div className="panel h-80 animate-pulse" />
+        </div>
       </div>
     </div>
   );
 }
 
-function Kpi({ label, value, color }: { label: string; value: string; color: string }) {
+function ClassXray({ classRoster, at }: { classRoster: StudentRecord[]; at: number }) {
+  // The live student (their practice shows up here) joins the 30 synthetic classmates: 31 rows.
+  const student = useStore((s) => s.student);
+  const mastery = useStore((s) => s.mastery);
+  const schedule = useStore((s) => s.schedule);
+  const attempts = useStore((s) => s.attempts);
+  const roster = useMemo<StudentRecord[]>(
+    () => [...classRoster, { id: student.id, name: student.name, profile: "average", theta: student.theta, mastery, misconceptions: student.misconceptions, attempts, schedule }],
+    [classRoster, student, mastery, schedule, attempts],
+  );
+
+  const [mcFilter, setMcFilter] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const [worksheet, setWorksheet] = useState<WorksheetRequest | null>(null);
+
+  const kpis = useMemo(() => computeKpis(roster, at), [roster, at]);
+  const trend = useMemo(() => classTrend(roster, at), [roster, at]);
+  const mcStats = useMemo(() => misconceptionStats(roster), [roster]);
+  const weakest = useMemo(() => weakestConcepts(roster, 8), [roster]);
+
+  const openWorksheet = (w: WeakConcept) =>
+    setWorksheet({
+      conceptId: w.conceptId,
+      misconceptionIds: w.misconceptions.map((m) => m.id),
+      classStats: {
+        classSize: roster.length,
+        affectedPct: Object.fromEntries(w.misconceptions.map((m) => [m.id, Math.round((m.count / roster.length) * 100)])),
+        avgMastery: Math.round(w.mean * 100) / 100,
+        weakCount: w.weakCount,
+      },
+    });
+
   return (
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="font-mono text-xl tabular" style={{ color }}>{value}</div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h1 className="font-display text-xl font-semibold">Class X-ray</h1>
+        <span className="text-sm text-muted-foreground">Class 10 Physics · {TEACHER_NAME} · {roster.length} students · mean θ {Math.round(roster.reduce((s, r) => s + r.theta, 0) / roster.length)}</span>
+        <span className="ml-auto font-mono text-xs text-muted-foreground tabular">
+          lowest student {Math.min(...roster.map(studentMean)).toFixed(2)} · highest {Math.max(...roster.map(studentMean)).toFixed(2)}
+        </span>
+      </div>
+
+      <KpiStrip kpis={kpis} trend={trend} onTopMisconception={setMcFilter} />
+
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <MasteryHeatmap roster={roster} at={at} mcFilter={mcFilter} onMcFilter={setMcFilter} onOpenStudent={setOpenId} highlightConcept={highlight} />
+        <div className="flex min-w-0 flex-col gap-4">
+          <MisconceptionChart stats={mcStats} size={roster.length} active={mcFilter} onSelect={setMcFilter} />
+          <WeakestConcepts weakest={weakest} size={roster.length} highlighted={highlight} onHighlight={setHighlight} onWorksheet={openWorksheet} onMcFilter={setMcFilter} />
+          <ChapterMasteryBars roster={roster} />
+        </div>
+      </div>
+
+      <StudentDrawer student={roster.find((s) => s.id === openId) ?? null} at={at} onClose={() => setOpenId(null)} />
+      <WorksheetDialog request={worksheet} onClose={() => setWorksheet(null)} />
     </div>
   );
 }

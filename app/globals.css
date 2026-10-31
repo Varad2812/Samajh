@@ -216,3 +216,33 @@
 .katex {
   font-size: 1.05em;
 }
+
+/* Printable worksheet: print only the dialog's .print-area, on white. */
+@media print {
+  body {
+    background: #fff !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .print-area .no-print {
+    display: none !important;
+  }
+  .print-sheet {
+    break-inside: avoid;
+  }
+}
