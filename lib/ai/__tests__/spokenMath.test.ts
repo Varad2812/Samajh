@@ -38,6 +38,7 @@ describe("parseSpokenMath", () => {
     expect(values[1]).toBeCloseTo(9.937, 3); // (1/3) log 3
     expect(eq.spokenResult).toBe(10.5);
     expect(eq.latex).toContain("\\frac");
+    expect(eq.latex).toContain("\\log_{10}"); // log is base 10, never rendered as ln
   });
 
   it("ignores ordinary prose that merely contains operator-ish words", () => {

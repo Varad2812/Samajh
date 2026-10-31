@@ -163,7 +163,8 @@ export function ConceptNode({ concept, position, data, selected, dimmed, reduced
         )}
       </group>
 
-      {(hovered || selected) && (
+      {/* The selected node's label is the scene-level SelectedLabel (always mounted: no Html portal churn). */}
+      {hovered && !selected && (
         <Html position={[0, r + 0.32, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
           <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface/90 px-2 py-1 text-xs whitespace-nowrap shadow-highlight backdrop-blur">
             <span className="font-mono text-muted-foreground">{concept.id}</span>

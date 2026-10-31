@@ -183,3 +183,36 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Focused reasoning textarea: flowing accent border + waveform bars ("Listening for Wispr Flow…", purely visual). */
+.listening-border {
+  position: relative;
+}
+.listening-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent));
+  background-size: 200% 100%;
+  animation: listen-flow 2.4s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+@keyframes listen-flow {
+  to { background-position: -200% 0; }
+}
+.wave-bar {
+  transform-origin: center;
+  animation: wave-bounce 1s ease-in-out infinite;
+}
+@keyframes wave-bounce {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.katex {
+  font-size: 1.05em;
+}

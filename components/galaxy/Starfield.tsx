@@ -5,9 +5,11 @@ import { useFrame } from "@react-three/fiber";
 import { Html, Stars } from "@react-three/drei";
 import type * as THREE from "three";
 import { useSignals } from "@/components/fx/SceneSignals";
-import { CHAPTERS } from "@/lib/data/concepts";
+import { CHAPTERS, CONCEPT_BY_ID } from "@/lib/data/concepts";
 import { IGNITION } from "@/lib/galaxy/ignition";
-import { CHAPTER_COLOR, galaxyLayout } from "@/lib/galaxy/layout";
+import { CHAPTER_COLOR, galaxyLayout, nodeRadius } from "@/lib/galaxy/layout";
+import { fmt2, masteryColor, TOKENS } from "@/lib/utils";
+import type { GalaxyNodeData } from "./types";
 
 /** Distant drei stars; hidden until the big bang during Ignition. */
 export function Starfield({ reducedMotion, count = 3500 }: { reducedMotion: boolean; count?: number }) {
@@ -42,5 +44,34 @@ export function ClusterLabels({ hidden = false }: { hidden?: boolean }) {
         );
       })}
     </>
+  );
+}
+
+/**
+ * Label of the selected node. One Html, always mounted, that moves between nodes: unmounting drei Html while
+ * the selection changes mid-render throws removeChild errors.
+ */
+export function SelectedLabel({ id, data }: { id: string | null; data: GalaxyNodeData | null }) {
+  const { positions } = galaxyLayout();
+  const concept = id ? CONCEPT_BY_ID[id] : null;
+  const [x, y, z] = id ? positions[id] : [0, 0, 0];
+  const r = concept ? nodeRadius(concept.weight) : 0;
+  return (
+    <Html position={[x, y + r + 0.32, z]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+      <div
+        className="flex items-center gap-1.5 rounded-md border border-border bg-surface/90 px-2 py-1 text-xs whitespace-nowrap shadow-highlight backdrop-blur transition-opacity duration-200"
+        style={{ opacity: concept && data ? 1 : 0 }}
+      >
+        {concept && data && (
+          <>
+            <span className="font-mono text-muted-foreground">{concept.id}</span>
+            <span>{concept.name}</span>
+            <span className="font-mono tabular" style={{ color: data.estimated ? TOKENS.muted : masteryColor(data.p) }}>
+              {data.estimated ? "est." : ""} {fmt2(data.p)}
+            </span>
+          </>
+        )}
+      </div>
+    </Html>
   );
 }

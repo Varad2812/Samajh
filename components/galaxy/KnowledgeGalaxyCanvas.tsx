@@ -47,7 +47,7 @@ function useIgnition(signals: SceneSignals, reducedMotion: boolean) {
   return { ignitionId, igniting, skip };
 }
 
-export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, resetKey = 0 }: GalaxyProps) {
+export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, resetKey = 0, igniteOnMount = false }: GalaxyProps) {
   const reducedMotion = useReducedMotion();
   const [signals] = useState(() => new SceneSignals());
   const perf = usePerformanceFallback();
@@ -62,6 +62,8 @@ export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, hig
         gl={{ antialias: false, powerPreference: "high-performance" }}
         onPointerDown={() => igniting && skip()}
         onPointerMissed={() => onSelect?.(null)}
+        // The diagnostic reveal mounts this canvas and wants Ignition once the renderer exists.
+        onCreated={() => igniteOnMount && window.setTimeout(() => useStore.getState().triggerFx({ kind: "ignition" }), 0)}
         aria-label="Knowledge Galaxy: 3D map of concepts coloured by mastery"
         data-quality={perf.quality.low ? "low" : "high"}
       >

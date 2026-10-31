@@ -235,11 +235,21 @@ export function evaluateReading(expr: string): number | null {
   return null;
 }
 
+/** math.js's default TeX treats `log` as natural; here `log` is base 10 (shown as log₁₀) and `ln` is natural. */
+function texHandler(node: MathNode, options: object): string | undefined {
+  if (!math.isFunctionNode(node) || node.args.length !== 1) return undefined;
+  const name = (node.fn as MathNode & { name?: string }).name;
+  const arg = node.args[0].toTex(options);
+  if (name === "log") return `\\log_{10}\\left(${arg}\\right)`;
+  if (name === "ln") return `\\ln\\left(${arg}\\right)`;
+  return undefined;
+}
+
 /** math.js expression (optionally `a = b`) → LaTeX for KaTeX. Empty string when it cannot be parsed. */
 export function mathjsToLatex(expr: string): string {
   try {
     return equationSides(expr)
-      .map((side) => math.parse(side).toTex({ parenthesis: "keep" }))
+      .map((side) => math.parse(side).toTex({ parenthesis: "auto", handler: texHandler }))
       .join(" = ")
       .replace(/\\mathrm\{([A-Za-z])\}/g, "$1") // a lone V, A or m is a variable here, not a unit
       .replace(/([A-Za-z])\s*\\cdot\s*(?=[A-Za-z])/g, "$1 ")

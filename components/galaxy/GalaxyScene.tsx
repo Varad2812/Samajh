@@ -12,7 +12,7 @@ import { ConceptNode } from "./ConceptNode";
 import { Dust } from "./Dust";
 import { Nebulae } from "./Nebulae";
 import { PrereqEdges } from "./PrereqEdges";
-import { ClusterLabels, Starfield } from "./Starfield";
+import { ClusterLabels, SelectedLabel, Starfield } from "./Starfield";
 import type { GalaxyNodes } from "./types";
 
 interface Props {
@@ -69,6 +69,7 @@ export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedM
         />
       ))}
       {!compact && <ClusterLabels hidden={igniting} />}
+      <SelectedLabel id={selectedId} data={selectedId ? nodes[selectedId] : null} />
       <FxLayer events={events} reducedMotion={reducedMotion} />
       <PostStack />
     </>

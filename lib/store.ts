@@ -9,6 +9,9 @@ import { BKT_DEFAULTS } from "@/lib/engine/bkt";
 import { INITIAL_THETA } from "@/lib/engine/elo";
 import { DEMO_STUDENT_ID, generateClass, generateDemoStudent } from "@/lib/data/students";
 import { appendFx, misconceptionFx, shockwaveFor, type FxEvent, type FxInput } from "@/lib/fx";
+import type { Question } from "@/lib/data/questions";
+import type { AttemptOutcome } from "@/lib/engine/attempt";
+import type { DiagnosticOutcome } from "@/lib/engine/diagnostic";
 import type { Attempt, ConceptMastery, ReviewItem, StudentRecord } from "@/lib/types";
 
 export const DEFAULT_P_INIT = BKT_DEFAULTS.pInit;
@@ -38,6 +41,10 @@ interface SamajhState {
   mastery: Record<string, ConceptMastery>;
   schedule: Record<string, ReviewItem>;
   settings: SettingsSlice;
+  /** AI-generated questions kept for reuse by the selector. */
+  generated: Question[];
+  /** Calibrated question difficulty (question id → Elo). */
+  questionElo: Record<string, number>;
   /** Transient 3D effect events (not persisted). */
   fx: FxEvent[];
   fxSeq: number;
@@ -48,6 +55,13 @@ interface SamajhState {
   setReview: (conceptId: string, item: ReviewItem) => void;
   setTheta: (theta: number) => void;
   setStudentMisconceptions: (ids: string[]) => void;
+  /**
+   * Commit one graded attempt. Misconception changes are applied separately (setStudentMisconceptions)
+   * so the page can time the Misconception Strike after the camera arrives.
+   */
+  applyOutcome: (o: AttemptOutcome) => void;
+  applyDiagnostic: (o: DiagnosticOutcome) => void;
+  addGeneratedQuestion: (q: Question) => void;
   completeDiagnostic: () => void;
   fastForward: (days?: number) => void;
   setRole: (role: Role) => void;
@@ -67,6 +81,8 @@ const initialData = () => ({
   mastery: freshMastery(),
   schedule: {} as Record<string, ReviewItem>,
   settings: { role: "student" as Role, offsetDays: 0, offline: false },
+  generated: [] as Question[],
+  questionElo: {} as Record<string, number>,
 });
 
 export const useStore = create<SamajhState>()(
@@ -90,6 +106,27 @@ export const useStore = create<SamajhState>()(
           student: { ...s.student, misconceptions: ids },
           ...appendFx(s.fx, misconceptionFx(s.student.misconceptions, ids), s.fxSeq, Date.now()),
         })),
+      applyOutcome: (o) =>
+        set((s) => {
+          const wave = shockwaveFor(o.conceptId, o.before, o.after);
+          return {
+            mastery: o.mastery,
+            schedule: o.schedule,
+            attempts: [...s.attempts, o.attempt],
+            student: { ...s.student, theta: o.theta },
+            questionElo: { ...s.questionElo, [o.attempt.questionId]: o.questionElo },
+            ...(wave ? appendFx(s.fx, [wave], s.fxSeq, Date.now()) : {}),
+          };
+        }),
+      applyDiagnostic: (o) =>
+        set((s) => ({
+          mastery: o.mastery,
+          schedule: { ...s.schedule, ...o.schedule },
+          attempts: [...s.attempts, ...o.attempts],
+          // No fx here: the reveal canvas fires Ignition itself once it has mounted (see igniteOnMount).
+          student: { ...s.student, theta: o.theta, misconceptions: o.misconceptions, diagnosticDone: true },
+        })),
+      addGeneratedQuestion: (q) => set((s) => ({ generated: [...s.generated.filter((g) => g.id !== q.id), q].slice(-40) })),
       completeDiagnostic: () =>
         set((s) => ({ student: { ...s.student, diagnosticDone: true }, ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()) })),
       fastForward: (days = 3) => set((s) => ({ settings: { ...s.settings, offsetDays: s.settings.offsetDays + days } })),
@@ -104,6 +141,7 @@ export const useStore = create<SamajhState>()(
             attempts: demo.attempts,
             mastery: demo.mastery,
             schedule: demo.schedule,
+            questionElo: {},
             // The whole galaxy changes at once: reveal it with Ignition rather than 34 shockwaves.
             ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()),
           };
@@ -121,6 +159,8 @@ export const useStore = create<SamajhState>()(
         mastery: s.mastery,
         schedule: s.schedule,
         settings: s.settings,
+        generated: s.generated,
+        questionElo: s.questionElo,
       }),
     },
   ),

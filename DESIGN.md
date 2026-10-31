@@ -292,3 +292,65 @@ Format:
   - Offline analysis only recognises relations in the vocabulary file.
   - Offline cleaned text is an excerpt, not a rewrite.
   - Next: phase 5, the student flows.
+
+### Phase 5 — Student flows — 2026-10-31
+- Screens touched: Diagnostic, Practice, Review (all rebuilt); MiniGalaxy and Knowledge Galaxy (small fixes).
+- What changed (UI/UX)
+  - **Diagnostic** (`/student/diagnostic`):
+    - 12-step rail in chapter colours with ✓/✗ per answered step.
+    - Adaptive questions: one difficulty-2 opener per chapter, then per chapter correct → harder dependent concept, wrong → easier prerequisite.
+    - Reasoning is optional ("Skip reasoning →"); if given, it's analysed. A "Why this question" panel explains each pick, and a "Load demo profile" shortcut is in the side column.
+    - End screen: a full-height Galaxy Ignition reveal (fired once the canvas has mounted), then a summary column fading in after ~3s: score, θ, strongest and weakest chapter, chapter bars, detected misconceptions, "Start your plan".
+  - **Practice** (`/student/practice`, with `?concept=ID`, `?mode=review`, or auto):
+    - Question card, then the Wispr Flow textarea. It has a mono font, a live word count, and a flowing accent border with waveform bars and "Listening for Wispr Flow…" on focus. ⏎ submits, ⇧⏎ adds a new line. A browser-mic backup button appears only where the Web Speech API exists.
+    - Submit shows a 3-step progress ("Cleaning speech → Checking reasoning → Updating model").
+    - **"Did you mean?"** bar (when equations or terms are detected) runs before grading:
+      - spoken maths as KaTeX chips (spoken phrase above, computed value beside), each with ✓ / ✎;
+      - ✎ opens an inline MathLive field with the virtual keyboard and a live KaTeX + math.js preview;
+      - ambiguous expressions become an A/B choice with each reading's value and a "matches what you said" tag on the auto-pick;
+      - normalized terms (resisters → resistors) get ✓ / ✎;
+      - "✓ all" confirms everything. Edits are stored on the attempt.
+    - **Analysis panel**, staggered reveal:
+      - Transcript diff: raw with fillers struck, self-corrections as amber pills, retracted text struck in amber, hedges dotted, evidence underlined violet. The cleaned version shows claim bullets and equation chips, plus a legend.
+      - Confidence gauge with its reasons.
+      - Verdict card with feedback.
+      - Misconception card: what you believed → what really happens, plus the verbatim quote.
+      - "Why did I get this?" and "Next question" / "Probe C1".
+    - Right column (sticky, so it stays visible while reading the analysis):
+      - MiniGalaxy;
+      - mastery delta (`.08 → .09`, θ before → after, next review, SM-2 EF and interval, "Root cause: likely C1");
+      - session stats plus the per-concept verdict history.
+    - **3D moments on the MiniGalaxy:** a Mastery Shockwave on the practised node at grading. If the misconception lives elsewhere, the camera then flies to that concept (~1.1s) and the Misconception Strike lands there. A re-detected misconception still strikes. Two sound answers in a row on its concept clear it, and the satellite shatters.
+  - **Review** (`/student/review`):
+    - Header with the virtual date, "Fast-forward 3 days" and "Start review (n)".
+    - KPI tiles: due, overdue, due in 3 days, scheduled.
+    - Table with an overdue chip, the misconception tag on the concept, EF, interval, reps, and Start / Review early, which runs practice in review mode (next goes to the next due concept).
+    - Nothing due → the next 5 upcoming reviews are shown.
+  - Shift+D (load demo profile) and ⏩ +3 days in the top bar were already present and are unchanged.
+- Engine and data:
+  - `lib/engine/attempt.ts` (pure, tested) turns one graded answer into the whole update: BKT (half weight for calculation slips), prerequisite propagation, the misconception (from the analyzer, else the tapped distractor), the misconception's concept marked suspect, Elo and question calibration, SM-2, clearing (2 sound in a row), and root cause (the misconception's concept first, else weak/suspect prerequisites).
+  - `lib/engine/diagnostic.ts`: the adaptive diagnostic.
+  - The store gains `applyOutcome`, `applyDiagnostic`, `generated` questions and `questionElo`.
+  - When no seeded question is within ±150 Elo, practice requests `/api/generate-question` and swaps the generated question in if the student hasn't answered yet.
+  - New seeded question **C6-4** (series bulbs, MC01 distractors). It is the demo's "series-circuit question" at the right Elo for Aarav.
+- Deviations from spec + why:
+  - The analysis sits in the left column instead of full width, with a sticky right column, so the MiniGalaxy Strike and the mastery delta stay on screen during the analysis.
+  - The analyzer runs first and the confirm bar gates *committing* the grade. Edits are stored and re-evaluated with math.js, but the AI is not re-called. This avoids a second round-trip.
+  - After a wrong answer, very low mastery can still rise slightly (`.08 → .09`) because the spec's learning transition adds `0.5·pT`. Kept as specified.
+  - `log` is now rendered as log₁₀ in KaTeX (math.js's default TeX printed `ln`), with redundant parentheses dropped.
+  - The selected node's label is now one always-mounted scene-level `<Html>`. Swapping per-node labels when the MiniGalaxy refocused threw `removeChild`.
+- Verified: an end-to-end run in real Edge on the production build with no API key (offline analyzer):
+  - Demo step 1: landing → Student → ⇧D → Ignition.
+  - Step 2: C6 practice picks C6-4. Tap "Dimmer" and dictate the demo transcript.
+  - Step 3: confidence .38, 3 self-corrections, 2 hedges, MC01 with a verbatim quote, Incorrect, C6 delta, MiniGalaxy flies to C1, Strike fires, "Root cause: likely C1".
+  - Step 4: "Probe C1" picks C1-2 (an MC01 distractor within ±150 Elo). Correct and confident → C1 .18 → .52 (amber) with a shockwave.
+  - Step 5: +3 days → the review queue grows to 18 including C6 and C1. Start runs review mode.
+  - Diagnostic: 12 unique questions, reasoning on one detects MC01, the Ignition reveal plays, 22 concepts are estimated.
+  - Confirm bar: KaTeX chips, MathLive field, A/B choice (10.477 vs 9.9372); choosing B is stored as an edit.
+  - No horizontal scroll at 390px on practice, diagnostic or review. No console errors.
+  - 147 tests (15 new), lint and build clean.
+- Known issues / next:
+  - The MiniGalaxy's framing of C1 is wide because its neighbour M2 sits in the Magnetism cluster.
+  - The live Claude path is still untested without a key.
+  - "See it in 3D" on misconception cards arrives in phase 6B.
+  - Next: phase 6, Teacher.

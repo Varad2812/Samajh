@@ -44,6 +44,19 @@ export interface Attempt {
   masteryBefore?: number;
   masteryAfter?: number;
   at: number;
+  mode?: AttemptMode;
+  cleanedReasoning?: string;
+  /** "Did you mean" corrections the student made before grading (PROJECT.md §5.5). */
+  edits?: AttemptEdit[];
+}
+
+export type AttemptMode = "practice" | "review" | "diagnostic";
+
+export interface AttemptEdit {
+  kind: "equation" | "term" | "reading";
+  /** What the analyzer proposed (LaTeX, a term, or the reading index as a string). */
+  from: string;
+  to: string;
 }
 
 export type StudentProfileKind = "strong" | "average" | "struggling";

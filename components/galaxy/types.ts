@@ -10,6 +10,8 @@ export interface GalaxyProps {
   highlightIds?: ReadonlySet<string> | null;
   /** Increment to fly the camera back to the overview. */
   resetKey?: number;
+  /** Fire Galaxy Ignition as soon as the renderer is created (diagnostic reveal). */
+  igniteOnMount?: boolean;
 }
 
 export interface MiniGalaxyProps {
