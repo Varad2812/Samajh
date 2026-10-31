@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { CornerDownRight, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { MiniGalaxy } from "@/components/galaxy";
 import { AnalysisPanel, AnalysisProgress } from "@/components/practice/AnalysisPanel";
+import { BeforeYouAnswer } from "@/components/practice/BeforeYouAnswer";
 import { ConfirmBar } from "@/components/practice/ConfirmBar";
 import { MasteryDelta } from "@/components/practice/MasteryDelta";
 import { QuestionCard } from "@/components/practice/QuestionCard";
@@ -119,6 +120,7 @@ function PracticeSession({ initial }: { initial: Target }) {
           </div>
         </section>
 
+        {s.phase === "answer" && q && <BeforeYouAnswer question={q} mastery={mastery} />}
         {s.phase === "analyzing" && <AnalysisProgress />}
         {s.phase === "confirm" && s.pending && <ConfirmBar analysis={s.pending.analysis} onConfirm={s.confirm} />}
         {s.phase === "result" && s.result && q && s.selected !== null && (

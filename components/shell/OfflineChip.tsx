@@ -12,7 +12,8 @@ export function OfflineChip() {
     <Tooltip>
       <TooltipTrigger className="flex h-6 items-center gap-1.5 rounded-full border border-developing/30 bg-developing/10 px-2.5 text-xs font-medium text-developing focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
         <WifiOff className="size-3" aria-hidden />
-        offline
+        <span className="hidden sm:inline">offline</span>
+        <span className="sr-only sm:hidden">offline</span>
       </TooltipTrigger>
       <TooltipContent side="bottom">Offline mode: using the built-in analyzer</TooltipContent>
     </Tooltip>

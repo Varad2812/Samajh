@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { CalendarClock, FastForward, Play } from "lucide-react";
-import { daysBetween, formatVirtualDate } from "@/lib/clock";
+import { daysBetween, formatVirtualDate, startOfDay } from "@/lib/clock";
+import { generateDemoStudent } from "@/lib/data/students";
 import { CONCEPT_BY_ID } from "@/lib/data/concepts";
 import { MISCONCEPTION_BY_ID } from "@/lib/data/misconceptions";
 import { dueConceptIds, useHydrated, useStore, useVirtualNow } from "@/lib/store";
@@ -75,13 +76,13 @@ export default function ReviewPage() {
         ))}
       </div>
 
-      <section className="panel overflow-x-auto">
+      <section className="panel overflow-x-auto" aria-label="Review queue">
         {ready && due.length === 0 && upcoming.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
             Nothing due on {formatVirtualDate(at)}. The next {upcoming.length} upcoming reviews are below; try ⏩ Fast-forward 3 days.
           </div>
         )}
-        <table className="w-full min-w-[720px] text-sm">
+        <table className={cn("w-full min-w-[720px] text-sm", ready && rows.length === 0 && "hidden")}>
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="px-4 py-2.5 font-medium">Concept</th>
@@ -143,15 +144,65 @@ export default function ReviewPage() {
               })}
           </tbody>
         </table>
-        {ready && rows.length === 0 && (
-          <div className="flex flex-wrap items-center gap-3 p-4 text-sm text-muted-foreground">
-            Reviews are scheduled after you answer questions. Take the diagnostic, or load Aarav&apos;s demo profile to see a populated queue.
-            <button onClick={loadDemoProfile} className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-foreground hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
-              Load demo profile
-            </button>
-          </div>
-        )}
+        {ready && rows.length === 0 && <EmptyQueue at={at} onDemo={loadDemoProfile} />}
       </section>
+    </div>
+  );
+}
+
+const LADDER = [
+  { q: "Wrong, or a misconception", next: "tomorrow", tone: "text-weak" },
+  { q: "Right but shaky reasoning", next: "1 day → 6 days", tone: "text-developing" },
+  { q: "Right and confident", next: "1 → 6 → 6×EF days", tone: "text-mastered" },
+];
+
+/** Never an empty table: how SM-2 schedules reviews, plus a dimmed sample of Aarav's real queue. */
+function EmptyQueue({ at, onDemo }: { at: number; onDemo: () => void }) {
+  const demo = generateDemoStudent(startOfDay(at));
+  const sample = dueConceptIds(demo.schedule, at).slice(0, 5);
+  return (
+    <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm">Nothing scheduled yet. Every answer you give schedules its concept for review, spaced by how well you knew it:</p>
+        <ul className="flex flex-col gap-1.5">
+          {LADDER.map((l) => (
+            <li key={l.q} className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs">
+              <span className={l.tone}>●</span>
+              <span>{l.q}</span>
+              <span className="ml-auto font-mono text-muted-foreground tabular">{l.next}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/student/diagnostic" className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-bg transition-colors hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg focus-visible:outline-none">
+            Take the diagnostic
+          </Link>
+          <button onClick={onDemo} className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm transition-colors hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
+            Load demo profile
+          </button>
+        </div>
+      </div>
+      <div className="rounded-lg border border-dashed border-border p-3" aria-label="Sample review queue">
+        <div className="mb-2 flex items-center gap-2 text-xs">
+          <span className="rounded-full bg-surface-2 px-2 py-0.5 text-muted-foreground">Sample</span>
+          <span className="text-muted-foreground">what Aarav&apos;s queue looks like today</span>
+        </div>
+        <ul className="flex flex-col opacity-70">
+          {sample.map((id) => {
+            const item = demo.schedule[id];
+            const d = daysBetween(at, item.due);
+            return (
+              <li key={id} className="flex items-center gap-2 border-b border-border/50 py-1.5 text-xs last:border-0">
+                <span className="size-2 rounded-full" style={{ background: masteryColor(demo.mastery[id].p) }} />
+                <span className="font-mono text-muted-foreground">{id}</span>
+                <span className="min-w-0 truncate">{CONCEPT_BY_ID[id].name}</span>
+                <span className="ml-auto font-mono tabular" style={{ color: masteryColor(demo.mastery[id].p) }}>{fmt2(demo.mastery[id].p)}</span>
+                <span className={cn("w-20 text-right font-mono tabular", d < 0 ? "text-weak" : "text-developing")}>{d < 0 ? `${-d}d overdue` : "today"}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

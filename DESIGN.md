@@ -402,3 +402,25 @@ Format:
   - The lab opens and closes cleanly. React's "synchronously unmount a root" warning appears in dev only, not in production.
   - The phase 5 flows re-run with no errors.
 - Known issues: the labels no longer get the DOM backdrop blur; they use a dark rounded-rect texture instead.
+
+### Phase 7 — Polish — 2026-10-31
+- **Landing (`/`):**
+  - A full-bleed, auto-rotating Knowledge Galaxy behind a left-aligned hero: "The tutor that listens to how you think.", the sub-line, "Take the 4-minute diagnostic" and "Load demo profile ⇧D".
+  - Two role cards with **live** stats:
+    - Student: mastery, attempts, reviews due, active misconceptions. These are the student's own once they have data, else Aarav's demo, labelled "(demo)".
+    - Teacher: class mean, at risk, top misconception, from the seeded roster.
+  - A "How it works" strip with three illustrated examples (marked-up transcript, MC01 card with root cause, a glowing C1 node .18 → .52).
+- **Empty and loading states:**
+  - Review with nothing scheduled shows an SM-2 interval ladder plus a dimmed **sample** of Aarav's queue and two CTAs, instead of an empty table.
+  - Practice shows a "Before you answer" row under the question: misconceptions we'll listen for, prerequisites with their mastery, and example spoken reasoning.
+  - The landing stats show skeleton pulses until hydration. The existing page skeletons (practice, teacher, diagnostic, galaxy starfield) were checked.
+- **Focus and motion:** a global `:focus-visible` fallback ring, and `MotionConfig reducedMotion="user"` so every framer-motion animation follows the OS setting (on top of the CSS rule and the 3D reduced-motion paths).
+- **390px fixes:** the landing role cards were clipped (grid min-content) and are now fixed. With the offline chip showing, the top bar overflowed by 21px; the chip is now icon-only below `sm`. There is no horizontal scroll on any page at 390px in either state.
+- **Docs:** README (pitch, features, demo script, run, architecture, deploy) and VOICE_LOG.md (the project was built by dictating every phase prompt with Wispr Flow; includes the prompts). `.env.example` added and un-ignored.
+- **Verified** (production build, real Edge, no API key):
+  - Audit of 6 pages × {1440×900, 390} × {fresh, demo} plus reduced motion: no console errors, no horizontal scroll.
+  - The full PROJECT.md §8 demo script, steps 1–6, run **twice** in fresh browsers. Both runs passed every step: Ignition; MC01 at .38 with a Strike on C1 and "Root cause: likely C1"; the 3D lab opens; Probe C1 → .52 amber; +3 days → 18 due; teacher MC01 filter → worksheet with Print → 3D Constellation. Zero console errors.
+  - 164 tests, lint and build clean.
+- **Deviations:**
+  - The landing lives inside the app shell, with the side nav and top bar kept for navigation, rather than a separate chrome-less page.
+  - The live Claude path is still untested without a key.
