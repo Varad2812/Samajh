@@ -11,13 +11,16 @@ interface Props {
   color?: string;
   background?: string | null;
   weight?: number;
+  opacity?: number;
+  /** Constant on-screen size: `height` is then a fraction of the viewport height (galaxy labels at any zoom). */
+  screenSpace?: boolean;
 }
 
 /**
  * Billboarded text drawn to a canvas texture. No DOM (drei Html) and no font download (drei Text),
  * so it works offline and never throws on unmount.
  */
-export function TextSprite({ text, position = [0, 0, 0], height = 0.22, color = "#E7E9F0", background = "rgba(14,16,24,0.82)", weight = 600 }: Props) {
+export function TextSprite({ text, position = [0, 0, 0], height = 0.22, color = "#E7E9F0", background = "rgba(14,16,24,0.82)", weight = 600, opacity = 1, screenSpace = false }: Props) {
   const { texture, aspect } = useMemo(() => {
     const scale = 4;
     const font = `${weight} ${32 * scale}px Inter, ui-sans-serif, system-ui, sans-serif`;
@@ -50,7 +53,7 @@ export function TextSprite({ text, position = [0, 0, 0], height = 0.22, color = 
 
   return (
     <sprite position={position} scale={[height * aspect * 1.3, height * 1.3, 1]} renderOrder={10}>
-      <spriteMaterial map={texture} transparent depthWrite={false} depthTest={false} toneMapped={false} />
+      <spriteMaterial map={texture} transparent opacity={opacity} sizeAttenuation={!screenSpace} depthWrite={false} depthTest={false} toneMapped={false} />
     </sprite>
   );
 }

@@ -27,7 +27,7 @@ function Pillar({ at, share }: { at: [number, number, number]; share: number }) 
       <sprite position={[0, h, 0]} scale={[0.45, 0.45, 1]}>
         <spriteMaterial map={glowTexture()} color={TOKENS.misconception} transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </sprite>
-      {share >= 0.1 && <TextSprite text={`${Math.round(share * 100)}%`} position={[0, h + 0.32, 0]} height={0.2} color={TOKENS.misconception} />}
+      {share >= 0.1 && <TextSprite text={`${Math.round(share * 100)}%`} position={[0, h + 0.32, 0]} height={0.022} screenSpace color={TOKENS.misconception} />}
     </group>
   );
 }

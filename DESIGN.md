@@ -395,6 +395,10 @@ Format:
   - The galaxy is coloured by class-mean mastery. Violet pillars show the % of students holding a misconception on each concept, and swirling violet storm clouds with lightning flickers sit over the top 3 (C1, C7, E3).
   - It has a legend and a click-for-detail card (class mean, % misconception, count below .40, root cause). The leaderboard filter and weakest-list hover focus a concept.
 - Verified: in dev, all four labs open with 2 canvases at 115–144 fps on the iGPU; camera sync confirmed (dragging one view moved both); the slider and toggle work. 164 tests (12 new), lint and build clean.
-- Not yet verified / known issues:
-  - The Constellation and the route warp were type-checked and built but not visually checked in the browser before the usage limit.
-  - The dev console shows React's "synchronously unmount a root" warning when a lab dialog closes (R3F canvas teardown); it's not yet confirmed whether it appears in production.
+- Follow-up (same phase): all galaxy labels (cluster names, the selected label, hover labels, Constellation %) are now canvas-texture sprites at a constant on-screen size, instead of drei `<Html>`. The DOM labels threw `removeChild` whenever a full galaxy canvas unmounted (Student → Teacher navigation, 3D → 2D toggle).
+- Verified on the production build in real Edge:
+  - Route warp plays on Student → Teacher and clears after ~500ms.
+  - The Constellation runs at 144 fps, with pillars, 3 storm clouds (C1, C7, E3), and the MC01 filter flying to C1 with the detail card (class mean .34, 39% misconception, 18/31 below .40).
+  - The lab opens and closes cleanly. React's "synchronously unmount a root" warning appears in dev only, not in production.
+  - The phase 5 flows re-run with no errors.
+- Known issues: the labels no longer get the DOM backdrop blur; they use a dark rounded-rect texture instead.

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Billboard, Html, Line } from "@react-three/drei";
+import { Billboard, Line } from "@react-three/drei";
+import { TextSprite } from "@/components/lab/TextSprite";
 import * as THREE from "three";
 import { glowTexture } from "@/components/fx/glowTexture";
 import { useSignals } from "@/components/fx/SceneSignals";
@@ -21,7 +22,7 @@ interface Props {
   selected: boolean;
   dimmed: boolean;
   reducedMotion: boolean;
-  /** MiniGalaxy: no DOM labels (drei Html portals throw removeChild when the whole canvas unmounts, e.g. a closing drawer). */
+  /** MiniGalaxy: no hover labels (the canvas is too small for them). */
   compact?: boolean;
   /** Date.now() of a nearby shockwave → brief brightening (prerequisite "unlock" feel). */
   boostAt?: number;
@@ -165,17 +166,15 @@ export function ConceptNode({ concept, position, data, selected, dimmed, reduced
         )}
       </group>
 
-      {/* The selected node's label is the scene-level SelectedLabel (always mounted: no Html portal churn). */}
+      {/* Canvas-texture label (no DOM: drei Html threw removeChild when a galaxy canvas unmounted). Selected → SelectedLabel. */}
       {hovered && !selected && !compact && (
-        <Html position={[0, r + 0.32, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-          <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface/90 px-2 py-1 text-xs whitespace-nowrap shadow-highlight backdrop-blur">
-            <span className="font-mono text-muted-foreground">{concept.id}</span>
-            <span>{concept.name}</span>
-            <span className="font-mono tabular" style={{ color: data.estimated ? TOKENS.muted : masteryColor(data.p) }}>
-              {data.estimated ? "est." : ""} {fmt2(data.p)}
-            </span>
-          </div>
-        </Html>
+        <TextSprite
+          text={`${concept.id}  ${concept.name}  ${data.estimated ? "est. " : ""}${fmt2(data.p)}`}
+          position={[0, r + 0.42, 0]}
+          height={0.022}
+          screenSpace
+          color={data.estimated ? TOKENS.text : masteryColor(data.p)}
+        />
       )}
     </group>
   );
