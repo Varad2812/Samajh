@@ -38,6 +38,8 @@ export interface GeminiOptions<S extends z.ZodType> {
   grounded?: boolean;
   timeoutMs?: number;
   liteTimeoutMs?: number;
+  /** Low thinking is fast; long-form content where accuracy matters (whole tests) can turn it off. Default true. */
+  lowThinking?: boolean;
   /** Extra check after zod passes; return a message to reject. */
   verify?: Verify<S>;
 }
@@ -86,7 +88,7 @@ async function attempt<S extends z.ZodType>(system: string, user: string, schema
 /** Grounded call, then plain JSON mode, then the lite model. Never throws; `reason` lists every failure. */
 export async function callGeminiJson<S extends z.ZodType>(system: string, user: string, schema: S, opts: GeminiOptions<S> = {}): Promise<AiResult<z.output<S>>> {
   if (!hasGeminiKey()) return { ok: false, reason: "no-key" };
-  const { grounded = true, timeoutMs = PLAIN_TIMEOUT_MS, liteTimeoutMs = LITE_TIMEOUT_MS, verify } = opts;
+  const { grounded = true, timeoutMs = PLAIN_TIMEOUT_MS, liteTimeoutMs = LITE_TIMEOUT_MS, lowThinking = true, verify } = opts;
   const failures: string[] = [];
   if (grounded && Date.now() >= groundingBlockedUntil) {
     const r = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: true, timeoutMs: GROUNDED_TIMEOUT_MS, lowThinking: true, verify });
@@ -94,7 +96,7 @@ export async function callGeminiJson<S extends z.ZodType>(system: string, user: 
     if (r.reason === "api-error:429") groundingBlockedUntil = Date.now() + GROUNDING_COOLDOWN_MS;
     failures.push(`grounded:${r.reason}`);
   }
-  const plain = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: false, timeoutMs, lowThinking: true, verify });
+  const plain = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: false, timeoutMs, lowThinking, verify });
   if (plain.ok) return plain;
   failures.push(`plain:${plain.reason}`);
   const lite = await attempt(system, user, schema, { model: LITE_MODEL, grounded: false, timeoutMs: liteTimeoutMs, lowThinking: false, verify });

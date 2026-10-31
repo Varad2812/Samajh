@@ -36,6 +36,7 @@ export function customTestPrompt(req: CustomTestRequest): { system: string; user
       'Each question: 4 distinct options, exactly one correct (correctIndex 0-3), no "all/none of the above".',
       "distractorWhy has 4 entries: for each wrong option, the misconception that leads a student to pick it (one sentence); \"\" for the correct option.",
       "explanation: 1-3 sentences on why the answer is right.",
+      "Write only final, checked text: no working, notes, \"wait\", corrections or ellipses inside stems or options. If a question turns out ambiguous, replace it.",
       "",
       'JSON shape: {"title","units":[{"id","name","short"}],"topics":[{"id","name","unit","prereqs","weight","summary"}],' +
         '"questions":[{"topicId","difficulty","stem","options","correctIndex","explanation","distractorWhy"}]}',
@@ -46,10 +47,19 @@ export function customTestPrompt(req: CustomTestRequest): { system: string; user
   };
 }
 
+/** The model sometimes leaks its own working into a question ("…11.3 g) wait..."): such questions are dropped. */
+const LEAKED_WORKING = /\bwait\b|\bhmm+\b|\blet me\b|\bactually,|\(recheck|\.\.\.\s*$/i;
+
+function usableQuestion(q: TrackAI["questions"][number], topicIds: Set<string>): boolean {
+  if (!topicIds.has(q.topicId)) return false;
+  if (new Set(q.options.map((o) => o.trim().toLowerCase())).size !== 4) return false;
+  return ![q.stem, ...q.options].some((t) => LEAKED_WORKING.test(t));
+}
+
 /** Reject model output that cannot make a usable test (counts as a failed attempt so the retry runs). */
 export function verifyTrackAI(ai: TrackAI, req: CustomTestRequest): string | null {
   const topicIds = new Set(ai.topics.map((t) => t.id));
-  const usable = ai.questions.filter((q) => topicIds.has(q.topicId) && new Set(q.options.map((o) => o.trim().toLowerCase())).size === 4);
+  const usable = ai.questions.filter((q) => usableQuestion(q, topicIds));
   if (usable.length < Math.max(4, Math.ceil(req.count * 0.6))) return "too-few-valid-questions";
   return null;
 }
@@ -77,9 +87,9 @@ export function shapeTrack(req: CustomTestRequest, ai: TrackAI, id: string, at: 
   const units = ai.units.map((u) => ({ id: u.id, name: u.name, short: (u.short || u.name).slice(0, 18) }));
   const graph = makeGraph(id, units, ai.topics.map((t) => ({ id: t.id, name: t.name, chapter: t.unit, prereqs: t.prereqs, weight: t.weight, summary: t.summary })));
   const questions: TrackQuestion[] = [];
+  const topicIds = new Set(graph.concepts.map((c) => c.id));
   for (const q of ai.questions) {
-    if (!graph.byId[q.topicId] || questions.length >= req.count) continue;
-    if (new Set(q.options.map((o) => o.trim().toLowerCase())).size !== 4) continue;
+    if (questions.length >= req.count || !usableQuestion(q, topicIds)) continue;
     const why = [0, 1, 2, 3].map((i) => (i === q.correctIndex ? "" : (q.distractorWhy[i] ?? "").trim())) as TrackQuestion["distractorWhy"];
     const shaped = shuffleOptions(
       {

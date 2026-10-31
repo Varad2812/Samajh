@@ -11,8 +11,15 @@ async function run(req: CustomTestRequest): Promise<AiEnvelope<CustomTrack | nul
   const at = Date.now();
   const id = `trk_${randomUUID().slice(0, 8)}`;
   const { system, user } = customTestPrompt(req);
-  // A whole test is a long answer: no grounding, generous timeouts (route maxDuration below).
-  const res = await callGeminiJson(system, user, trackAISchema, { grounded: false, timeoutMs: 50_000, liteTimeoutMs: 30_000, verify: (d) => verifyTrackAI(d, req) });
+  // A whole test is a long answer where correctness matters: full thinking, no grounding, generous timeouts
+  // (route maxDuration below), then the fast lite model if that fails.
+  const res = await callGeminiJson(system, user, trackAISchema, {
+    grounded: false,
+    lowThinking: false,
+    timeoutMs: 55_000,
+    liteTimeoutMs: 28_000,
+    verify: (d) => verifyTrackAI(d, req),
+  });
   const track = res.ok ? shapeTrack(req, res.data, id, at) : null;
   const env: AiEnvelope<CustomTrack | null> = track
     ? { source: "ai", data: track }
