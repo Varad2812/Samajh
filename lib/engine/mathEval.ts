@@ -204,3 +204,47 @@ function convert(s: string): string {
 export function latexToMathjs(latex: string): string {
   return convert(latex).replace(/\s+/g, " ").trim();
 }
+
+// ───────────── Spoken-reading helpers (PROJECT.md §5.5) ─────────────
+
+/** Sides of an equation (`a = b`), or the expression itself when there is no `=`. */
+export function equationSides(expr: string): string[] {
+  return expr.split(/(?<![<>!=])=(?!=)/).map((s) => s.trim());
+}
+
+/** Every side of the (optional) equation parses. */
+export function isParsable(expr: string): boolean {
+  try {
+    equationSides(expr).forEach((side) => math.parse(side));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Numeric value of a reading. For `lhs = rhs` the first purely numeric side wins. Anything with a free
+ * variable (V, I, R …) has no value, so single-letter names are never mistaken for math.js units.
+ */
+export function evaluateReading(expr: string): number | null {
+  for (const side of equationSides(expr)) {
+    if (!side || !isParsable(side) || freeSymbols(side).length > 0) continue;
+    const v = evaluateExpression(side);
+    if (v !== null) return v;
+  }
+  return null;
+}
+
+/** math.js expression (optionally `a = b`) → LaTeX for KaTeX. Empty string when it cannot be parsed. */
+export function mathjsToLatex(expr: string): string {
+  try {
+    return equationSides(expr)
+      .map((side) => math.parse(side).toTex({ parenthesis: "keep" }))
+      .join(" = ")
+      .replace(/\\mathrm\{([A-Za-z])\}/g, "$1") // a lone V, A or m is a variable here, not a unit
+      .replace(/([A-Za-z])\s*\\cdot\s*(?=[A-Za-z])/g, "$1 ")
+      .replace(/\s+/g, " ");
+  } catch {
+    return "";
+  }
+}

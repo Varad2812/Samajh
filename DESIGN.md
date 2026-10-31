@@ -260,3 +260,35 @@ Format:
   - `?debug` (or a dev build) exposes `window.__samajh = { store, fx }` for rehearsal and testing.
 - Verified: real Edge on the Intel UHD iGPU, 1440×900, production build. Idle and auto-rotate 144 fps, full Ignition 144 fps, fly-to 143 fps (worst frame 21ms), all five effects fired at once 144 fps (worst 14ms), MiniGalaxy strike 144 fps, forced-low 144 fps. On battery at 60 Hz in phase 3 it was a locked 60. Skip works; no console errors. 11 new tests (94 total).
 - Known issues / next: at overview distance the four dust arms are present but read as a field around a bright core rather than crisp arms. Next: phase 4 AI layer.
+
+### Phase 4 — AI layer — 2026-10-31
+- Screens touched: none directly. TopBar's existing offline chip is now wired to real fallbacks. The phase 5 flows will call these routes.
+- What was built:
+  - **Three routes**, `POST /api/analyze-reasoning`, `/api/generate-question`, `/api/remedial-worksheet`. Each validates its body with zod (400 on bad input) and answers `{ source: "ai" | "offline", reason?, data }`.
+  - **Model call** (`lib/ai/client.ts`): `claude-haiku-5-5`, strict-JSON prompts (`lib/ai/prompts.ts`), reply validated by zod (`lib/ai/schemas.ts`). 8s timeout per attempt, one retry on any failure (timeout, API error, bad JSON, schema mismatch, rejected content). Any remaining failure falls back. The key is read from `ANTHROPIC_API_KEY` (`.env.local`) on the server only.
+  - **Speech-to-math (§5.5)**: `equations` (spoken, latex, mathjs, meaning, `alternatives`, `spokenResult`) and `normalizedTerms`. Code evaluates every reading with math.js and adds `values`, `pickedIndex` (reading within 2% of the spoken result) and `needsChoice` (→ the one-tap "Did you mean A or B?"). `log` is base 10. LaTeX is rebuilt from math.js if the model's is missing.
+  - **Physics vocabulary** (`lib/ai/physicsVocab.ts`): mis-heard terms, spoken operators, number words, symbols, known relations (Ohm's law, lens/mirror formula …) and the prompt glossary.
+  - **Code enforces what the model must not decide** (`lib/ai/postprocess.ts`): the verdict must match the tapped option; the misconception id must be a candidate; `evidenceQuote` must be verbatim from the raw transcript (re-snapped, else the misconception is dropped); confidence = 0.6·AI + 0.4·baseline; a spoken answer that differs from the tapped option feeds `answerMismatch`. Also returns `calculationSlip` for right relation + wrong arithmetic (BKT weight halving is applied in phase 5).
+  - **Offline fallbacks**
+    - Analyzer (`offlineAnalyzer.ts` + `spokenMath.ts`): cue matching against `misconception.cues`, the confidence baseline, filler removal, last-self-correction-wins cleaning, the seeded explanation, and a spoken-math parser. It returns both groupings for ambiguous speech, e.g. "log 6 plus one by three log three plus three squared" → 10.477 and 9.937.
+    - Question: nearest seeded question by Elo, preferring one whose distractor targets the misconception, skipping `avoidStems`.
+    - Worksheet: seeded questions + each misconception's `correctIdea`, with teacher notes from the class stats.
+  - **Generated questions are verified**: duplicate options, repeated stems, bad distractor maps, and a numeric self-check (`check.mathjs` re-evaluated in code and compared with the correct option) are all rejected → retry → fallback.
+  - **OfflineChip**: `lib/ai/api.ts` (browser callers) sets `settings.offline` from each response. If the route is unreachable the same fallback runs locally. An empty explanation is not a failure and does not show the chip.
+- Deviations from spec + why:
+  - Added `mathjs`, `alternatives`, `spokenResult` to `equations`, plus `calculationSlip`, `confidenceDetail` and an optional `questionId` in the request. They are needed by §5.5 and don't change the §6.1 fields.
+  - The timeout is 8s per attempt, so the worst case is ~16s before falling back. The browser gives up at 20s.
+  - A transcript under 3 words skips the model call entirely and uses the deterministic analyzer.
+  - `temperature` is not sent (the SDK rejects it for this model).
+  - `window.__samajh.ai` joins `store` and `fx` under `?debug` for testing.
+- Verified:
+  - 132 tests pass (38 new in `lib/ai/__tests__`), lint and build clean.
+  - Each route is tested without a key (offline, SDK never called) and with a key against a mocked SDK: success, fenced JSON, one retry, schema/API failure, and timeout (fake timers: 8s, retry, fallback). Rejection paths for generated questions and 400s are covered.
+  - Real production server without a key, and with an invalid key against the real SDK: all three routes fell back with 200, ~1.8s including the retry.
+  - Real Edge: the chip appears after a fallback and when the route is unreachable, and hides on an empty explanation.
+  - **Not verified: a live call with a valid Anthropic key.** None was available in this environment, so the real model's replies and the prompts have not been exercised end to end.
+- Known issues / next:
+  - Add a key to `.env.local` and run a smoke test before relying on live output.
+  - Offline analysis only recognises relations in the vocabulary file.
+  - Offline cleaned text is an excerpt, not a rewrite.
+  - Next: phase 5, the student flows.
