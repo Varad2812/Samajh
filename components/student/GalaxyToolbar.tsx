@@ -3,13 +3,18 @@
 import { Search, X } from "lucide-react";
 import { CHAPTERS } from "@/lib/data/concepts";
 import { CHAPTER_COLOR } from "@/lib/galaxy/layout";
-import { masteryColor, TOKENS } from "@/lib/utils";
+import { LENSES, type Lens } from "@/lib/galaxy/lenses";
+import { cn, masteryColor, TOKENS } from "@/lib/utils";
 
 interface Props {
   query: string;
   matches: number;
   onQuery: (q: string) => void;
   onSubmit: () => void;
+  lens: Lens;
+  /** Lit-star count per lens (null = all). */
+  lensCounts: Record<Lens, number | null>;
+  onLens: (lens: Lens) => void;
 }
 
 const MASTERY_LEGEND: [string, string][] = [
@@ -21,7 +26,7 @@ const MASTERY_LEGEND: [string, string][] = [
 ];
 
 /** Overlay on top of the galaxy: chapter legend · mastery legend · search. */
-export function GalaxyToolbar({ query, matches, onQuery, onSubmit }: Props) {
+export function GalaxyToolbar({ query, matches, onQuery, onSubmit, lens, lensCounts, onLens }: Props) {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-start gap-x-4 gap-y-2 bg-gradient-to-b from-bg/90 to-transparent p-3 pb-8">
       <div className="pointer-events-auto">
@@ -46,6 +51,22 @@ export function GalaxyToolbar({ query, matches, onQuery, onSubmit }: Props) {
           <span className="flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-misconception" /> misconception
           </span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1" role="toolbar" aria-label="Galaxy lens">
+          {LENSES.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => onLens(l.id)}
+              aria-pressed={lens === l.id}
+              className={cn(
+                "flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] backdrop-blur transition-colors hover:border-accent/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                lens === l.id ? "border-accent/60 bg-accent/15 text-foreground" : "border-border bg-surface-2/80 text-muted-foreground",
+              )}
+            >
+              {l.label}
+              {lensCounts[l.id] !== null && <span className="font-mono tabular opacity-70">{lensCounts[l.id]}</span>}
+            </button>
+          ))}
         </div>
       </div>
       <form

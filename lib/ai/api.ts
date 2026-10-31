@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { offlineAnalysis } from "./offlineAnalyzer";
 import { finalizeAnalysis } from "./postprocess";
 import { offlineQuestion } from "./questions";
+import { offlinePlan, type StudyPlan, type StudyPlanRequest } from "./studyPlan";
 import type {
   AiEnvelope,
   AnalysisResult,
@@ -21,14 +22,14 @@ import { offlineWorksheet } from "./worksheet";
 const NO_REASONING = "no-reasoning";
 const CLIENT_TIMEOUT_MS = 20_000;
 
-async function post<T>(path: string, body: unknown, local: () => T): Promise<AiEnvelope<T>> {
+async function post<T>(path: string, body: unknown, local: () => T, timeoutMs = CLIENT_TIMEOUT_MS): Promise<AiEnvelope<T>> {
   let env: AiEnvelope<T>;
   try {
     const res = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     env = (await res.json()) as AiEnvelope<T>;
@@ -48,4 +49,8 @@ export const generateQuestion = (req: GenerateQuestionRequest) =>
 export const remedialWorksheet = (req: WorksheetRequest) =>
   post<Worksheet>("/api/remedial-worksheet", req, () => offlineWorksheet(req));
 
-export const ai = { analyzeReasoning, generateQuestion, remedialWorksheet };
+/** Grounded search plus link checks can take a while, so this one gets a longer client timeout. */
+export const studyPlan = (req: StudyPlanRequest) =>
+  post<StudyPlan>("/api/study-plan", req, () => offlinePlan(req, Date.now()), 60_000);
+
+export const ai = { analyzeReasoning, generateQuestion, remedialWorksheet, studyPlan };

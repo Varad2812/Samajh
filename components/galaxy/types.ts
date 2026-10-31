@@ -9,6 +9,8 @@ export interface GalaxyProps {
   onSelect?: (id: string | null) => void;
   /** Search matches; non-matching nodes dim. null = no filter. */
   highlightIds?: ReadonlySet<string> | null;
+  /** Video-plan concepts in watch order, drawn as a flowing route. */
+  pathIds?: string[] | null;
   /** Increment to fly the camera back to the overview. */
   resetKey?: number;
   /** Fire Galaxy Ignition as soon as the renderer is created (diagnostic reveal). */

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { AccountGate } from "@/components/shell/AccountGate";
+import { AccountSync } from "@/components/shell/AccountSync";
 import { MotionProvider } from "@/components/shell/MotionProvider";
 import { RouteWarp } from "@/components/shell/RouteWarp";
 import { SideNav } from "@/components/shell/SideNav";
@@ -27,11 +29,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <MotionProvider>
         <TooltipProvider delay={250}>
           <StoreHydrator />
+          <AccountSync />
           <RouteWarp />
           <TopBar />
           <div className="flex flex-1">
             <SideNav />
-            <main className="min-w-0 flex-1 p-4">{children}</main>
+            <main className="min-w-0 flex-1 p-4">
+              <AccountGate>{children}</AccountGate>
+            </main>
           </div>
         </TooltipProvider>
         </MotionProvider>

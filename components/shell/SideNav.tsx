@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardCheck, Home, PencilLine, RefreshCw, School, type LucideIcon } from "lucide-react";
+import { ClipboardCheck, History, Home, PencilLine, RefreshCw, School, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dueConceptIds, useStore, useVirtualNow } from "@/lib/store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,6 +18,7 @@ const ITEMS: NavItem[] = [
   { href: "/student/diagnostic", label: "Diagnostic", icon: ClipboardCheck },
   { href: "/student/practice", label: "Practice", icon: PencilLine },
   { href: "/student/review", label: "Review", icon: RefreshCw },
+  { href: "/student/activity", label: "Activity log", icon: History },
   { href: "/teacher", label: "Teacher", icon: School },
 ];
 

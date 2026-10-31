@@ -10,6 +10,7 @@ import { IGNITION } from "@/lib/galaxy/ignition";
 import { useStore } from "@/lib/store";
 import { BASE_FOV, CameraRig, HOME_POSITION } from "./CameraRig";
 import { GalaxyScene } from "./GalaxyScene";
+import { StudyPath } from "./StudyPath";
 import type { GalaxyProps } from "./types";
 import { usePerformanceFallback } from "./usePerformanceFallback";
 import { useReducedMotion } from "./useReducedMotion";
@@ -47,7 +48,7 @@ function useIgnition(signals: SceneSignals, reducedMotion: boolean) {
   return { ignitionId, igniting, skip };
 }
 
-export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, resetKey = 0, igniteOnMount = false, children }: GalaxyProps) {
+export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, pathIds = null, resetKey = 0, igniteOnMount = false, children }: GalaxyProps) {
   const reducedMotion = useReducedMotion();
   const [signals] = useState(() => new SceneSignals());
   const perf = usePerformanceFallback();
@@ -79,6 +80,7 @@ export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, hig
               igniting={igniting}
               onSelect={(id) => onSelect?.(id)}
             />
+            {pathIds && pathIds.length > 0 && <StudyPath ids={pathIds} reducedMotion={reducedMotion} />}
             {children}
             <IgnitionDirector ignitionId={ignitionId} />
             <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan={false} minDistance={2.5} maxDistance={34} rotateSpeed={0.6} autoRotateSpeed={0.35} />

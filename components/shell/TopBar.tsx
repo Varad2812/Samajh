@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AccountMenu } from "./AccountMenu";
 import { OfflineChip } from "./OfflineChip";
 import { VirtualClock } from "./VirtualClock";
 
@@ -92,6 +93,7 @@ export function TopBar() {
           </TooltipTrigger>
           <TooltipContent side="bottom">Reset demo (clears progress and clock)</TooltipContent>
         </Tooltip>
+        <AccountMenu />
       </div>
     </header>
   );

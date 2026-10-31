@@ -9,6 +9,7 @@ import { BKT_DEFAULTS } from "@/lib/engine/bkt";
 import { INITIAL_THETA } from "@/lib/engine/elo";
 import { DEMO_STUDENT_ID, generateClass, generateDemoStudent } from "@/lib/data/students";
 import { appendFx, misconceptionFx, shockwaveFor, type FxEvent, type FxInput } from "@/lib/fx";
+import type { StudyPlan } from "@/lib/ai/studyPlan";
 import type { Question } from "@/lib/data/questions";
 import type { AttemptOutcome } from "@/lib/engine/attempt";
 import type { DiagnosticOutcome } from "@/lib/engine/diagnostic";
@@ -45,6 +46,8 @@ interface SamajhState {
   generated: Question[];
   /** Calibrated question difficulty (question id → Elo). */
   questionElo: Record<string, number>;
+  /** Latest 45-minute YouTube plan for the weakest concepts. */
+  studyPlan: StudyPlan | null;
   /** Transient 3D effect events (not persisted). */
   fx: FxEvent[];
   fxSeq: number;
@@ -68,7 +71,28 @@ interface SamajhState {
   setOffline: (offline: boolean) => void;
   loadDemoProfile: () => void;
   resetDemo: () => void;
+  setStudyPlan: (plan: StudyPlan | null) => void;
+  toggleStudyItem: (itemId: string) => void;
+  /** Replace progress with an account's saved snapshot (or a fresh profile for a new account). */
+  loadAccount: (account: { name: string; role: Role }, saved: Partial<PersistedState> | null) => void;
 }
+
+/** The slices saved to localStorage and to the account database. */
+export type PersistedState = Pick<
+  SamajhState,
+  "student" | "attempts" | "mastery" | "schedule" | "settings" | "generated" | "questionElo" | "studyPlan"
+>;
+
+export const persistedSlice = (s: SamajhState): PersistedState => ({
+  student: s.student,
+  attempts: s.attempts,
+  mastery: s.mastery,
+  schedule: s.schedule,
+  settings: s.settings,
+  generated: s.generated,
+  questionElo: s.questionElo,
+  studyPlan: s.studyPlan,
+});
 
 const freshMastery = (): Record<string, ConceptMastery> =>
   Object.fromEntries(
@@ -83,6 +107,7 @@ const initialData = () => ({
   settings: { role: "student" as Role, offsetDays: 0, offline: false },
   generated: [] as Question[],
   questionElo: {} as Record<string, number>,
+  studyPlan: null as StudyPlan | null,
 });
 
 export const useStore = create<SamajhState>()(
@@ -146,22 +171,35 @@ export const useStore = create<SamajhState>()(
             ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()),
           };
         }),
-      resetDemo: () => set(initialData()),
+      resetDemo: () => set((s) => ({ ...initialData(), student: { ...initialData().student, name: s.student.name } })),
+      setStudyPlan: (plan) => set({ studyPlan: plan }),
+      toggleStudyItem: (itemId) =>
+        set((s) =>
+          s.studyPlan
+            ? { studyPlan: { ...s.studyPlan, items: s.studyPlan.items.map((v) => (v.id === itemId ? { ...v, done: !v.done } : v)) } }
+            : {},
+        ),
+      loadAccount: (account, saved) =>
+        set((s) => {
+          const base = initialData();
+          const settings = { ...base.settings, ...saved?.settings, role: saved?.settings?.role ?? account.role, offline: false };
+          return {
+            ...base,
+            ...saved,
+            // Stored mastery may predate a concept added to the seed data.
+            mastery: { ...base.mastery, ...saved?.mastery },
+            student: { ...base.student, ...saved?.student, name: account.name },
+            settings,
+            ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()),
+          };
+        }),
     }),
     {
       name: "samajh-v1",
       storage: createJSONStorage(() => localStorage),
       // Rehydrated explicitly on the client (StoreHydrator) to avoid SSR mismatches.
       skipHydration: true,
-      partialize: (s) => ({
-        student: s.student,
-        attempts: s.attempts,
-        mastery: s.mastery,
-        schedule: s.schedule,
-        settings: s.settings,
-        generated: s.generated,
-        questionElo: s.questionElo,
-      }),
+      partialize: persistedSlice,
     },
   ),
 );

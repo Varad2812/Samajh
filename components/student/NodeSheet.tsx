@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Crosshair, X } from "lucide-react";
+import { ArrowRight, Crosshair, PlayCircle, X } from "lucide-react";
 import { Sparkline } from "@/components/shared/Sparkline";
 import { daysBetween, formatVirtualDate } from "@/lib/clock";
 import { CHAPTERS, CONCEPT_BY_ID, dependentsOf } from "@/lib/data/concepts";
 import { misconceptionsFor } from "@/lib/data/misconceptions";
 import { rootCauseOf } from "@/lib/engine/rootCause";
 import { CHAPTER_COLOR } from "@/lib/galaxy/layout";
+import { useStore } from "@/lib/store";
 import type { ConceptMastery, ReviewItem } from "@/lib/types";
 import { cn, fmt2, masteryBand, masteryColor } from "@/lib/utils";
 
@@ -29,6 +30,8 @@ export function NodeSheet({ conceptId, mastery, review, activeMisconceptions, at
   const chapter = CHAPTERS.find((ch) => ch.id === c.chapter);
   const root = rootCauseOf(mastery, conceptId);
   const dueIn = review && at !== null ? daysBetween(at, review.due) : null;
+  const plan = useStore((s) => s.studyPlan);
+  const videos = plan?.items.filter((v) => v.conceptId === conceptId) ?? [];
 
   return (
     <motion.aside
@@ -87,6 +90,36 @@ export function NodeSheet({ conceptId, mastery, review, activeMisconceptions, at
 
       <ChipRow title="Prerequisites" ids={c.prereqs} mastery={mastery} onSelect={onSelect} empty="Foundational concept" />
       <ChipRow title="Unlocks" ids={dependentsOf(c.id).map((d) => d.id)} mastery={mastery} onSelect={onSelect} empty="End of this branch" />
+
+      <div>
+        <div className="label-caps mb-1.5">From your video plan</div>
+        {videos.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Not in your 45-min plan. Build one from the panel on the right.</p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {videos.map((v) => (
+              <li key={v.id}>
+                <a
+                  href={v.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "flex items-start gap-2 rounded-lg border border-border bg-surface-2 p-2 text-xs transition-colors hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                    v.done && "opacity-60",
+                  )}
+                >
+                  <PlayCircle className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2">{v.title}</span>
+                    <span className="text-muted-foreground">{v.channel}</span>
+                  </span>
+                  <span className="font-mono text-muted-foreground tabular">{v.minutes}m</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div>
         <div className="label-caps mb-1.5">Misconceptions</div>
