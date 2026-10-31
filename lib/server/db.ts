@@ -43,9 +43,12 @@ CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 let ready: Promise<Client> | null = null;
 
 async function open(): Promise<Client> {
-  const url = process.env.DATABASE_URL?.trim() || (process.env.VERCEL ? SERVERLESS_URL : LOCAL_URL);
+  // TURSO_* are the names the Vercel Marketplace Turso integration sets.
+  const remote = process.env.DATABASE_URL?.trim() || process.env.TURSO_DATABASE_URL?.trim();
+  const url = remote || (process.env.VERCEL ? SERVERLESS_URL : LOCAL_URL);
   if (url === LOCAL_URL) mkdirSync("data", { recursive: true });
-  const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN?.trim() || undefined });
+  const authToken = process.env.DATABASE_AUTH_TOKEN?.trim() || process.env.TURSO_AUTH_TOKEN?.trim() || undefined;
+  const client = createClient({ url, authToken });
   await client.executeMultiple(SCHEMA);
   return client;
 }
