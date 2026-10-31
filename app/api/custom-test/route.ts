@@ -11,13 +11,12 @@ async function run(req: CustomTestRequest): Promise<AiEnvelope<CustomTrack | nul
   const at = Date.now();
   const id = `trk_${randomUUID().slice(0, 8)}`;
   const { system, user } = customTestPrompt(req);
-  // A whole test is a long answer where correctness matters: full thinking, no grounding, generous timeouts
-  // (route maxDuration below), then the fast lite model if that fails.
+  // A whole test is a long answer: no grounding, generous timeouts (route maxDuration below), then the lite model.
+  // Full thinking was tried and regularly ran past 100 s; low thinking + the leaked-working filter is the trade-off.
   const res = await callGeminiJson(system, user, trackAISchema, {
     grounded: false,
-    lowThinking: false,
-    timeoutMs: 55_000,
-    liteTimeoutMs: 28_000,
+    timeoutMs: 40_000,
+    liteTimeoutMs: 25_000,
     verify: (d) => verifyTrackAI(d, req),
   });
   const track = res.ok ? shapeTrack(req, res.data, id, at) : null;
