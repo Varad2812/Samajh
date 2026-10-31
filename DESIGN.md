@@ -258,5 +258,5 @@ Format:
   - Labels stay as drei `<Html>` (DOM) rather than `<Text>`; the §4.1 label item wasn't in this phase's scope.
   - Node emissive intensities were lowered from phase 3 so mastery hues survive ACES.
   - `?debug` (or a dev build) exposes `window.__samajh = { store, fx }` for rehearsal and testing.
-- Verified: real Edge on the Intel UHD iGPU, 1440×900, production build. Idle and auto-rotate 144 fps, full Ignition 144 fps, fly-to 143 fps (worst frame 21ms), all five effects fired at once 144 fps (worst 14ms), MiniGalaxy strike 144 fps, forced-low 144 fps. On battery at 60 Hz in phase 3 it was a locked 60. Skip works; no console errors. 13 new tests (96 total).
+- Verified: real Edge on the Intel UHD iGPU, 1440×900, production build. Idle and auto-rotate 144 fps, full Ignition 144 fps, fly-to 143 fps (worst frame 21ms), all five effects fired at once 144 fps (worst 14ms), MiniGalaxy strike 144 fps, forced-low 144 fps. On battery at 60 Hz in phase 3 it was a locked 60. Skip works; no console errors. 11 new tests (94 total).
 - Known issues / next: at overview distance the four dust arms are present but read as a field around a bright core rather than crisp arms. Next: phase 4 AI layer.
