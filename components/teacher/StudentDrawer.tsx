@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { MiniGalaxy } from "@/components/galaxy";
+import { SeeIn3D } from "@/components/lab/SeeIn3D";
 import { MasteryBar } from "@/components/shared/MasteryBar";
 import { RecentAttempts } from "@/components/student/RecentAttempts";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -109,15 +110,13 @@ function DrawerBody({ student, at }: { student: StudentRecord; at: number }) {
           student.misconceptions.map((id) => {
             const m = MISCONCEPTION_BY_ID[id];
             return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setFocus(m.conceptId)}
-                className="rounded-lg border border-misconception/20 bg-misconception/5 p-2.5 text-left text-xs transition-colors hover:border-misconception/50 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-              >
-                <span className="font-mono text-misconception">{id}</span> {m.label}
-                <span className="block text-muted-foreground">{m.wrongBelief}</span>
-              </button>
+              <div key={id} className="flex items-start gap-2 rounded-lg border border-misconception/20 bg-misconception/5 p-2.5 text-xs">
+                <button type="button" onClick={() => setFocus(m.conceptId)} className="min-w-0 flex-1 rounded text-left hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
+                  <span className="font-mono text-misconception">{id}</span> {m.label}
+                  <span className="block text-muted-foreground">{m.wrongBelief}</span>
+                </button>
+                <SeeIn3D mcId={id} compact />
+              </div>
             );
           })
         )}

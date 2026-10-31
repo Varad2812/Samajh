@@ -47,7 +47,7 @@ function useIgnition(signals: SceneSignals, reducedMotion: boolean) {
   return { ignitionId, igniting, skip };
 }
 
-export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, resetKey = 0, igniteOnMount = false }: GalaxyProps) {
+export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, resetKey = 0, igniteOnMount = false, children }: GalaxyProps) {
   const reducedMotion = useReducedMotion();
   const [signals] = useState(() => new SceneSignals());
   const perf = usePerformanceFallback();
@@ -79,6 +79,7 @@ export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, hig
               igniting={igniting}
               onSelect={(id) => onSelect?.(id)}
             />
+            {children}
             <IgnitionDirector ignitionId={ignitionId} />
             <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan={false} minDistance={2.5} maxDistance={34} rotateSpeed={0.6} autoRotateSpeed={0.35} />
             <CameraRig selectedId={selectedId} resetKey={resetKey} reducedMotion={reducedMotion} />

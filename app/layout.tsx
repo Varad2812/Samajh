@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { RouteWarp } from "@/components/shell/RouteWarp";
 import { SideNav } from "@/components/shell/SideNav";
 import { StoreHydrator } from "@/components/shell/StoreHydrator";
 import { TopBar } from "@/components/shell/TopBar";
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <TooltipProvider delay={250}>
           <StoreHydrator />
+          <RouteWarp />
           <TopBar />
           <div className="flex flex-1">
             <SideNav />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHAPTERS, CONCEPTS } from "@/lib/data/concepts";
 import { generateClass } from "@/lib/data/students";
-import { filterByMisconception, kpis, misconceptionStats, sortRoster, studentMean, weakestConcepts } from "../stats";
+import { filterByMisconception, kpis, misconceptionShareByConcept, misconceptionStats, sortRoster, stormConcepts, studentMean, weakestConcepts } from "../stats";
 
 const AT = new Date("2026-10-31T10:00:00").getTime();
 const roster = generateClass(AT);
@@ -54,5 +54,14 @@ describe("class X-ray aggregates", () => {
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(filterByMisconception(roster, "MC01")).toHaveLength(12);
     expect(filterByMisconception(roster, null)).toHaveLength(30);
+  });
+
+  it("Constellation: pillar heights are misconception shares; storms gather over the worst concepts", () => {
+    const share = misconceptionShareByConcept(roster);
+    expect(share.C1).toBeCloseTo(12 / 30, 6); // MC01 lives on C1
+    expect(Object.values(share).every((v) => v >= 0 && v <= 1)).toBe(true);
+    const storms = stormConcepts(roster);
+    expect(storms[0]).toBe("C1");
+    expect(storms).toEqual(expect.arrayContaining(["C7", "E3"])); // MC03, MC13
   });
 });

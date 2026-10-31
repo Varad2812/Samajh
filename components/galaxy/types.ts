@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { GalaxyNodes } from "@/lib/galaxy/nodes";
 
 export type { GalaxyNodeData, GalaxyNodes } from "@/lib/galaxy/nodes";
@@ -12,6 +13,8 @@ export interface GalaxyProps {
   resetKey?: number;
   /** Fire Galaxy Ignition as soon as the renderer is created (diagnostic reveal). */
   igniteOnMount?: boolean;
+  /** Extra R3F content rendered inside the scene (e.g. the teacher Constellation's pillars and storms). */
+  children?: ReactNode;
 }
 
 export interface MiniGalaxyProps {

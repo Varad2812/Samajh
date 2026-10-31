@@ -2,6 +2,7 @@
 
 import { ArrowRight, Sparkles } from "lucide-react";
 import { CONCEPT_BY_ID } from "@/lib/data/concepts";
+import { SeeIn3D } from "@/components/lab/SeeIn3D";
 import { MISCONCEPTION_BY_ID } from "@/lib/data/misconceptions";
 
 interface Props {
@@ -37,6 +38,7 @@ export function MisconceptionCard({ misconceptionId, novelDescription, evidenceQ
             lives in <span className="font-mono text-foreground">{mc.conceptId}</span> {CONCEPT_BY_ID[mc.conceptId]?.name}
           </span>
         )}
+        <SeeIn3D mcId={mc?.id} />
       </div>
       <div className="grid items-center gap-2 md:grid-cols-[1fr_auto_1fr]">
         <div className="rounded-lg border border-weak/20 bg-weak/5 p-3 text-sm">

@@ -8,6 +8,10 @@ import { StudentDrawer } from "@/components/teacher/StudentDrawer";
 import { WeakestConcepts } from "@/components/teacher/WeakestConcepts";
 import { WorksheetDialog } from "@/components/teacher/WorksheetDialog";
 import { ChapterMasteryBars } from "@/components/teacher/ChapterMasteryBars";
+import { ConstellationPanel } from "@/components/teacher/ConstellationPanel";
+import { Grid3x3, Orbit } from "lucide-react";
+import { MISCONCEPTION_BY_ID } from "@/lib/data/misconceptions";
+import { cn } from "@/lib/utils";
 import type { WorksheetRequest } from "@/lib/ai/schemas";
 import { TEACHER_NAME } from "@/lib/data/students";
 import { classTrend, kpis as computeKpis, misconceptionStats, studentMean, weakestConcepts, type WeakConcept } from "@/lib/teacher/stats";
@@ -52,6 +56,7 @@ function ClassXray({ classRoster, at }: { classRoster: StudentRecord[]; at: numb
   const [openId, setOpenId] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [worksheet, setWorksheet] = useState<WorksheetRequest | null>(null);
+  const [view, setView] = useState<"2d" | "3d">("2d");
 
   const kpis = useMemo(() => computeKpis(roster, at), [roster, at]);
   const trend = useMemo(() => classTrend(roster, at), [roster, at]);
@@ -82,8 +87,36 @@ function ClassXray({ classRoster, at }: { classRoster: StudentRecord[]; at: numb
 
       <KpiStrip kpis={kpis} trend={trend} onTopMisconception={setMcFilter} />
 
+      <div className="flex items-center gap-2">
+        <div className="flex rounded-lg border border-border bg-surface p-0.5" role="radiogroup" aria-label="Class view">
+          {([
+            ["2d", "2D Heatmap", Grid3x3],
+            ["3d", "3D Constellation", Orbit],
+          ] as const).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={view === key}
+              onClick={() => setView(key)}
+              className={cn(
+                "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                view === key && "bg-surface-2 text-foreground shadow-highlight",
+              )}
+            >
+              <Icon className="size-4" aria-hidden /> {label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-muted-foreground">{view === "3d" ? "Same galaxy, coloured by class average; violet pillars and storms mark misconceptions." : "Students × concepts, coloured by mastery."}</span>
+      </div>
+
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <MasteryHeatmap roster={roster} at={at} mcFilter={mcFilter} onMcFilter={setMcFilter} onOpenStudent={setOpenId} highlightConcept={highlight} />
+        {view === "2d" ? (
+          <MasteryHeatmap roster={roster} at={at} mcFilter={mcFilter} onMcFilter={setMcFilter} onOpenStudent={setOpenId} highlightConcept={highlight} />
+        ) : (
+          <ConstellationPanel roster={roster} focusConcept={highlight ?? (mcFilter ? MISCONCEPTION_BY_ID[mcFilter].conceptId : null)} />
+        )}
         <div className="flex min-w-0 flex-col gap-4">
           <MisconceptionChart stats={mcStats} size={roster.length} active={mcFilter} onSelect={setMcFilter} />
           <WeakestConcepts weakest={weakest} size={roster.length} highlighted={highlight} onHighlight={setHighlight} onWorksheet={openWorksheet} onMcFilter={setMcFilter} />

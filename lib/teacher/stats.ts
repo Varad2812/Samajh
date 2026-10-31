@@ -109,6 +109,26 @@ export function classTrend(roster: StudentRecord[], at: number, points = 8, span
   });
 }
 
+/** Concept → share of students holding at least one misconception that lives on it (Constellation pillar height). */
+export function misconceptionShareByConcept(roster: StudentRecord[]): Record<string, number> {
+  return Object.fromEntries(
+    CONCEPTS.map((c) => [
+      c.id,
+      roster.length ? roster.filter((s) => s.misconceptions.some((id) => MISCONCEPTION_BY_ID[id]?.conceptId === c.id)).length / roster.length : 0,
+    ]),
+  );
+}
+
+/** Concepts with the most misconception holders: where the Constellation's storm clouds gather. */
+export function stormConcepts(roster: StudentRecord[], limit = 3, minShare = 0.15): string[] {
+  const share = misconceptionShareByConcept(roster);
+  return Object.entries(share)
+    .filter(([, v]) => v >= minShare)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([id]) => id);
+}
+
 export type SortKey = "name" | "mean" | "misconceptions" | `chapter:${Chapter}` | `concept:${string}`;
 
 /** Heatmap row order. Mastery sorts put the weakest first. */

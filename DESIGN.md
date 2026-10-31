@@ -380,3 +380,21 @@ Format:
   - The 31st row (Aarav) is dark until a profile is loaded (⇧D).
   - The live Claude worksheet path is untested without a key.
   - Next: phase 6B (Misconception Lab + Class Constellation) or 7 (polish).
+
+### Phase 6B — Misconception Lab, route warp, Class Constellation — 2026-10-31
+- **Misconception Lab** (`components/lab/`):
+  - Shared split view ("What you said" vs "What really happens"): two R3F canvases with one synchronized orbit camera (`CameraSync`: whichever side you drag drives the other) and a "Reset view" control. Labels are canvas-texture sprites (no DOM, no font download).
+  - Four sims, each under 200 lines, driven by tested physics in `lib/lab/physics.ts`:
+    - **MC01 series circuit** (built first): flowing charges, three ammeters (said 0.50/0.30/0.10 A vs real 0.50 everywhere), bulb 2 dim vs equally bright, and energy sparks leaving the bulbs.
+    - **MC11 refraction**: an angle-of-incidence slider drives both; Snell's law with n = 1.5 vs bending away; angle arcs; light pulses bunch up in glass (v = c/n).
+    - **MC16 field around a wire**: radial spokes vs concentric rings; 36 compass needles swing to the field; a current-direction toggle flips them (right-hand thumb rule).
+    - **MC14 blue sky**: a sun-height slider; Rayleigh-scattered RGB photons (∝ 1/λ⁴) vs "sea reflections"; the arriving sunlight and the sky turn orange at sunset only in the real view.
+  - "See it in 3D" appears on the matching misconception cards: practice analysis, the student home's Active misconceptions, the teacher student drawer and the diagnostic reveal. The lab chunk loads on first open.
+- **Route warp**: a 500ms 2D-canvas star-streak overlay when navigating Student ↔ Teacher; skipped under reduced motion.
+- **Class Constellation**: a 2D Heatmap ⇄ 3D Constellation toggle on `/teacher`.
+  - The galaxy is coloured by class-mean mastery. Violet pillars show the % of students holding a misconception on each concept, and swirling violet storm clouds with lightning flickers sit over the top 3 (C1, C7, E3).
+  - It has a legend and a click-for-detail card (class mean, % misconception, count below .40, root cause). The leaderboard filter and weakest-list hover focus a concept.
+- Verified: in dev, all four labs open with 2 canvases at 115–144 fps on the iGPU; camera sync confirmed (dragging one view moved both); the slider and toggle work. 164 tests (12 new), lint and build clean.
+- Not yet verified / known issues:
+  - The Constellation and the route warp were type-checked and built but not visually checked in the browser before the usage limit.
+  - The dev console shows React's "synchronously unmount a root" warning when a lab dialog closes (R3F canvas teardown); it's not yet confirmed whether it appears in production.

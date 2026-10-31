@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Orbit, TrendingDown, TrendingUp } from "lucide-react";
 import { KnowledgeGalaxy } from "@/components/galaxy";
+import { SeeIn3D } from "@/components/lab/SeeIn3D";
 import { MasteryBar } from "@/components/shared/MasteryBar";
 import { CHAPTERS, CONCEPTS } from "@/lib/data/concepts";
 import { MISCONCEPTION_BY_ID } from "@/lib/data/misconceptions";
@@ -92,7 +93,10 @@ export function DiagnosticReveal({ outcome, score, total, at }: Props) {
           ) : (
             outcome.misconceptions.map((id) => (
               <div key={id} className="rounded-lg border border-misconception/20 bg-misconception/5 p-2.5 text-xs">
-                <span className="font-mono text-misconception">{id}</span> {MISCONCEPTION_BY_ID[id].label}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-misconception">{id}</span> {MISCONCEPTION_BY_ID[id].label}
+                  <SeeIn3D mcId={id} compact className="ml-auto" />
+                </div>
                 <div className="mt-0.5 text-muted-foreground">{MISCONCEPTION_BY_ID[id].wrongBelief}</div>
               </div>
             ))

@@ -15,4 +15,10 @@ export const MiniGalaxy = dynamic(() => import("./MiniGalaxyCanvas"), {
   loading: () => <GalaxyLoading label="Focusing…" />,
 });
 
+/** Teacher 3D Class Constellation: class-average colours, misconception pillars and storm clouds. */
+export const ClassConstellation = dynamic(() => import("./ClassConstellationCanvas"), {
+  ssr: false,
+  loading: () => <GalaxyLoading label="Mapping the class…" />,
+});
+
 export type { GalaxyNodeData, GalaxyNodes } from "./types";

@@ -1,6 +1,8 @@
 "use client";
 
+import { SeeIn3D } from "@/components/lab/SeeIn3D";
 import { MISCONCEPTION_BY_ID, MISCONCEPTIONS } from "@/lib/data/misconceptions";
+import { hasLab } from "@/lib/lab/physics";
 import type { Attempt } from "@/lib/types";
 
 interface Props {
@@ -36,7 +38,7 @@ export function ActiveMisconceptions({ active, attempts, onFocus }: Props) {
           {active.map((id) => {
             const m = MISCONCEPTION_BY_ID[id];
             return (
-              <li key={id}>
+              <li key={id} className="relative">
                 <button
                   onClick={() => onFocus(m.conceptId)}
                   className="w-full rounded-lg border border-misconception/25 bg-misconception/5 p-2.5 text-left transition-colors hover:border-misconception/50 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
@@ -47,6 +49,8 @@ export function ActiveMisconceptions({ active, attempts, onFocus }: Props) {
                     <span className="ml-auto font-mono text-xs text-muted-foreground tabular">
                       {m.conceptId} ×{seen[id] ?? 0}
                     </span>
+                    {/* Space for the absolutely positioned "See it in 3D" (no button inside a button). */}
+                    {hasLab(id) && <span className="w-[92px] shrink-0" aria-hidden />}
                   </div>
                   <div className="mt-1.5 text-xs text-muted-foreground">
                     <span className="line-through decoration-weak/60">{m.wrongBelief}</span>
@@ -54,6 +58,7 @@ export function ActiveMisconceptions({ active, attempts, onFocus }: Props) {
                     <span className="text-foreground/90">{m.correctIdea}</span>
                   </div>
                 </button>
+                <SeeIn3D mcId={id} compact className="absolute top-2.5 right-2.5" />
               </li>
             );
           })}
