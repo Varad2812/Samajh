@@ -41,6 +41,18 @@ function diffEvents(next: ReturnType<typeof useStore.getState>, prev: ReturnType
   }
   if (next.student.diagnosticDone && !prev.student.diagnosticDone) out.push({ kind: "diagnostic", payload: { theta: Math.round(next.student.theta) } });
   if (next.settings.offsetDays > prev.settings.offsetDays) out.push({ kind: "fast_forward", payload: { days: next.settings.offsetDays - prev.settings.offsetDays } });
+  if (next.trackResults !== prev.trackResults) {
+    for (const [id, r] of Object.entries(next.trackResults)) {
+      if (prev.trackResults[id]?.finishedAt === r.finishedAt) continue;
+      const track = next.tracks.find((t) => t.id === id);
+      const correct = r.answers.filter((a) => a.correct).length;
+      out.push({
+        kind: "custom_test_done",
+        at: r.finishedAt,
+        payload: { trackId: id, title: track?.title, subject: track?.subject, standard: track?.standard, correct, total: r.answers.length, wrongTopics: [...new Set(r.answers.filter((a) => !a.correct).map((a) => track?.questions.find((q) => q.id === a.questionId)?.topicId))].filter(Boolean) },
+      });
+    }
+  }
   if (next.studyPlan && prev.studyPlan && next.studyPlan.createdAt === prev.studyPlan.createdAt) {
     const before = new Map(prev.studyPlan.items.map((v) => [v.id, v.done]));
     for (const v of next.studyPlan.items) {

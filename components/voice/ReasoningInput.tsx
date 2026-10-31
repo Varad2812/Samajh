@@ -43,10 +43,11 @@ interface Props {
   /** Lighter variant for the diagnostic. */
   compact?: boolean;
   submitLabel?: string;
+  placeholder?: string;
 }
 
 /** The Wispr Flow target: a large focused textarea for messy spoken reasoning, plus a browser-mic backup. */
-export function ReasoningInput({ value, onChange, onSubmit, canSubmit, disabled = false, compact = false, submitLabel = "Submit" }: Props) {
+export function ReasoningInput({ value, onChange, onSubmit, canSubmit, disabled = false, compact = false, submitLabel = "Submit", placeholder = PLACEHOLDER }: Props) {
   const [focused, setFocused] = useState(false);
   const [listening, setListening] = useState(false);
   const supported = useSpeechSupported();
@@ -120,7 +121,7 @@ export function ReasoningInput({ value, onChange, onSubmit, canSubmit, disabled 
           }}
           disabled={disabled}
           rows={compact ? 2 : 4}
-          placeholder={PLACEHOLDER}
+          placeholder={placeholder}
           aria-label="Your reasoning (dictate with Wispr Flow or type)"
           className="block w-full resize-y rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/70 focus:outline-none disabled:opacity-60"
         />

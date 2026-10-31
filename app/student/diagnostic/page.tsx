@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles, WandSparkles } from "lucide-react";
 import { DiagnosticRail } from "@/components/diagnostic/DiagnosticRail";
 import { DiagnosticReveal } from "@/components/diagnostic/DiagnosticReveal";
 import { QuestionCard } from "@/components/practice/QuestionCard";
@@ -93,6 +94,19 @@ function Diagnostic() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
+      <Link
+        href="/student/create"
+        className="group flex items-center gap-3 rounded-xl border border-accent/30 bg-gradient-to-r from-accent/10 to-accent-2/10 p-3 transition-colors hover:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+      >
+        <span className="flex size-9 items-center justify-center rounded-lg bg-accent/15 text-accent">
+          <WandSparkles className="size-4" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">Not studying Class 10 Physics? Build your own test</span>
+          <span className="block text-xs text-muted-foreground">Any subject, class and board: tell us your syllabus and AI writes the test, then shows your mistakes in 3D.</span>
+        </span>
+        <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+      </Link>
       <section className="panel flex flex-col gap-3 p-4">
         <div className="flex flex-wrap items-baseline gap-3">
           <h1 className="font-display text-xl font-semibold">Diagnostic</h1>

@@ -85,7 +85,7 @@ export async function signOut(): Promise<void> {
   useAccount.setState({ status: "guest", user: null, lastSavedAt: null });
   // Nothing of this account stays on a shared device.
   useStore.getState().resetDemo();
-  useStore.setState((s) => ({ student: { ...s.student, name: "Student" }, studyPlan: null }));
+  useStore.setState((s) => ({ student: { ...s.student, name: "Student" }, studyPlan: null, tracks: [], activeTrackId: null }));
   try {
     localStorage.removeItem(LOCAL_KEY);
   } catch {
@@ -94,10 +94,15 @@ export async function signOut(): Promise<void> {
 }
 
 export async function saveState(): Promise<void> {
-  const { status, syncing } = useAccount.getState();
-  if (status !== "authed" || syncing) return;
+  const { status, syncing, user } = useAccount.getState();
+  if (status !== "authed" || syncing || !user) return;
   try {
-    const res = await fetch("/api/state", { method: "PUT", headers: json, body: JSON.stringify({ data: persistedSlice(useStore.getState()) }) });
+    const res = await fetch("/api/state", { method: "PUT", headers: json, body: JSON.stringify({ userId: user.id, data: persistedSlice(useStore.getState()) }) });
+    if (res.status === 409) {
+      // Signed in as someone else in another tab: load that account instead of overwriting it.
+      await bootstrapAccount();
+      return;
+    }
     const { updatedAt } = await asJson<{ updatedAt: number }>(res);
     useAccount.setState({ lastSavedAt: updatedAt, saveError: false });
   } catch {
@@ -107,8 +112,9 @@ export async function saveState(): Promise<void> {
 
 /** Best-effort save that survives the tab closing. */
 export function beaconState(): void {
-  if (useAccount.getState().status !== "authed") return;
-  const blob = new Blob([JSON.stringify({ data: persistedSlice(useStore.getState()) })], { type: "application/json" });
+  const { status, user } = useAccount.getState();
+  if (status !== "authed" || !user) return;
+  const blob = new Blob([JSON.stringify({ userId: user.id, data: persistedSlice(useStore.getState()) })], { type: "application/json" });
   navigator.sendBeacon("/api/state", blob);
 }
 
@@ -129,9 +135,10 @@ export async function flushState(): Promise<void> {
 }
 
 export async function logEvents(events: LogEvent[]): Promise<void> {
-  if (!events.length || useAccount.getState().status !== "authed") return;
+  const { status, user } = useAccount.getState();
+  if (!events.length || status !== "authed" || !user) return;
   for (let i = 0; i < events.length; i += 100) {
-    await fetch("/api/logs", { method: "POST", headers: json, body: JSON.stringify({ events: events.slice(i, i + 100) }) }).catch(() => undefined);
+    await fetch("/api/logs", { method: "POST", headers: json, body: JSON.stringify({ userId: user.id, events: events.slice(i, i + 100) }) }).catch(() => undefined);
   }
 }
 

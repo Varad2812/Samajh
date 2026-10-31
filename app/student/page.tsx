@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { Maximize2, Pause, Route } from "lucide-react";
 import { KnowledgeGalaxy } from "@/components/galaxy";
@@ -12,6 +13,7 @@ import { RecentAttempts } from "@/components/student/RecentAttempts";
 import { StatsRow } from "@/components/student/StatsRow";
 import { StudyPlanPanel } from "@/components/student/StudyPlanPanel";
 import { TodayPlan } from "@/components/student/TodayPlan";
+import { MyTests } from "@/components/tracks/MyTests";
 import { CONCEPTS } from "@/lib/data/concepts";
 import { LENSES, lensIds, type Lens } from "@/lib/galaxy/lenses";
 import { buildGalaxyNodes } from "@/lib/galaxy/nodes";
@@ -25,6 +27,15 @@ export default function StudentHome() {
   const student = useStore((s) => s.student);
   const loadDemoProfile = useStore((s) => s.loadDemoProfile);
   const plan = useStore((s) => s.studyPlan);
+  const router = useRouter();
+  const tracks = useStore((s) => s.tracks);
+  const trackResults = useStore((s) => s.trackResults);
+  const setActiveTrack = useStore((s) => s.setActiveTrack);
+  const removeTrack = useStore((s) => s.removeTrack);
+  const openTrack = (id: string, page: "test" | "report") => {
+    setActiveTrack(id);
+    router.push(`/student/${page}`);
+  };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -173,6 +184,9 @@ export default function StudentHome() {
               onLoadDemo={loadDemoProfile}
             />
             <StudyPlanPanel mastery={mastery} misconceptions={student.misconceptions} onFocus={focusPlanConcept} onBuilt={() => setLens("plan")} />
+            {tracks.length > 0 && (
+              <MyTests tracks={tracks.slice(0, 3)} results={trackResults} onTake={(id) => openTrack(id, "test")} onReport={(id) => openTrack(id, "report")} onRemove={removeTrack} />
+            )}
             <ChapterMasteryPanel mastery={mastery} at={at} />
             <ActiveMisconceptions active={student.misconceptions} attempts={attempts} onFocus={setSelectedId} />
             <RecentAttempts attempts={attempts} at={at} onFocus={setSelectedId} />

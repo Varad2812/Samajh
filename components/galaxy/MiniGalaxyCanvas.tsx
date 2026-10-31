@@ -5,7 +5,9 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PerformanceMonitor } from "@react-three/drei";
 import { QualityContext, SceneSignals, SignalsContext } from "@/components/fx/SceneSignals";
+import { PHYSICS_GRAPH, type GalaxyGraph } from "@/lib/galaxy/graph";
 import { galaxyLayout, oneHop } from "@/lib/galaxy/layout";
+import { GalaxyGraphContext } from "./GraphContext";
 import { GalaxyScene } from "./GalaxyScene";
 import { usePerformanceFallback } from "./usePerformanceFallback";
 import type { MiniGalaxyProps } from "./types";
@@ -14,9 +16,9 @@ import { useReducedMotion } from "./useReducedMotion";
 const IDLE_AFTER_MS = 4000;
 
 /** Frame the focus node and its 1-hop neighbours, viewed from outside the ring. */
-function framing(ids: string[]): { position: THREE.Vector3; target: THREE.Vector3 } {
-  const { positions } = galaxyLayout();
-  const pts = ids.map((id) => new THREE.Vector3(...positions[id]));
+function framing(ids: string[], g: GalaxyGraph): { position: THREE.Vector3; target: THREE.Vector3 } {
+  const { positions } = galaxyLayout(g);
+  const pts = ids.filter((id) => positions[id]).map((id) => new THREE.Vector3(...positions[id]));
   const target = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(pts.length);
   const radius = Math.max(0.8, ...pts.map((p) => p.distanceTo(target)));
   const outward = new THREE.Vector3(target.x, 0, target.z).normalize();
@@ -25,9 +27,9 @@ function framing(ids: string[]): { position: THREE.Vector3; target: THREE.Vector
 }
 
 /** Camera locked on the focus; eases to a new focus over ~800ms. No user controls. */
-function MiniRig({ focusId, reducedMotion }: { focusId: string; reducedMotion: boolean }) {
+function MiniRig({ focusId, reducedMotion, graph }: { focusId: string; reducedMotion: boolean; graph: GalaxyGraph }) {
   const camera = useThree((s) => s.camera);
-  const goal = useMemo(() => framing(oneHop(focusId)), [focusId]);
+  const goal = useMemo(() => framing(oneHop(focusId, graph), graph), [focusId, graph]);
   const look = useRef<THREE.Vector3 | null>(null);
   useFrame((_, dt) => {
     if (!look.current || reducedMotion) {
@@ -42,15 +44,15 @@ function MiniRig({ focusId, reducedMotion }: { focusId: string; reducedMotion: b
   return null;
 }
 
-export default function MiniGalaxyCanvas({ nodes, focusId, onSelect }: MiniGalaxyProps) {
+export default function MiniGalaxyCanvas({ nodes, focusId, onSelect, graph = PHYSICS_GRAPH }: MiniGalaxyProps) {
   const reducedMotion = useReducedMotion();
-  const hop = useMemo(() => new Set(oneHop(focusId)), [focusId]);
+  const hop = useMemo(() => new Set(oneHop(focusId, graph)), [focusId, graph]);
   const focusSet = useMemo(() => new Set([focusId]), [focusId]);
 
   // Render continuously after a change or while hovered; otherwise on demand (static frame).
   // Effects (shockwave, strike, shatter) always coincide with one of these changing, which wakes the render loop.
   const changeKey =
-    focusId + "|" + [...hop].map((id) => `${nodes[id].p.toFixed(3)}${nodes[id].due ? "d" : ""}m${nodes[id].misconceptions}`).join(",");
+    focusId + "|" + [...hop].filter((id) => nodes[id]).map((id) => `${nodes[id].p.toFixed(3)}${nodes[id].due ? "d" : ""}m${nodes[id].misconceptions}`).join(",");
   const [signals] = useState(() => new SceneSignals());
   const perf = usePerformanceFallback();
   const [idleKey, setIdleKey] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export default function MiniGalaxyCanvas({ nodes, focusId, onSelect }: MiniGalax
       aria-label={`Mini galaxy focused on ${focusId} and its neighbours`}
       data-quality={perf.quality.low ? "low" : "high"}
     >
+      <GalaxyGraphContext.Provider value={graph}>
       <SignalsContext.Provider value={signals}>
         <QualityContext.Provider value={perf.quality}>
           {!idle && <PerformanceMonitor bounds={perf.bounds} flipflops={3} onDecline={perf.onDecline} onIncline={perf.onIncline} onFallback={perf.onFallback} />}
@@ -84,9 +87,10 @@ export default function MiniGalaxyCanvas({ nodes, focusId, onSelect }: MiniGalax
             compact
             onSelect={onSelect}
           />
-          <MiniRig focusId={focusId} reducedMotion={reducedMotion} />
+          <MiniRig focusId={focusId} reducedMotion={reducedMotion} graph={graph} />
         </QualityContext.Provider>
       </SignalsContext.Provider>
+      </GalaxyGraphContext.Provider>
     </Canvas>
   );
 }

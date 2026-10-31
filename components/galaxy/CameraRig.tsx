@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree, type RootState } from "@react-three/fiber";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useSignals } from "@/components/fx/SceneSignals";
 import { IGNITION, smoothstep } from "@/lib/galaxy/ignition";
-import { galaxyLayout } from "@/lib/galaxy/layout";
+import { useGalaxyLayout } from "./GraphContext";
 
 export const HOME_POSITION = new THREE.Vector3(0, 13, 22);
 export const HOME_TARGET = new THREE.Vector3(0, 0, 0);
@@ -37,6 +37,10 @@ const controlsOf = (s: RootState) => s.controls as unknown as OrbitControlsImpl 
 export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selectedId: string | null; resetKey?: number; reducedMotion: boolean }) {
   const get = useThree((s) => s.get);
   const hasControls = useThree((s) => s.controls !== null);
+  const layout = useGalaxyLayout();
+  const home = useMemo(() => ({ pos: new THREE.Vector3(...layout.home.position), target: new THREE.Vector3(...layout.home.target) }), [layout]);
+  // Ignition starts near the core of whatever is framed.
+  const ignitionFrom = useMemo(() => home.target.clone().add(IGNITION_FROM), [home]);
   const signals = useSignals();
   const flight = useRef<Flight | null>(null);
   const interacting = useRef(false);
@@ -62,7 +66,9 @@ export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selecte
     const state = get();
     const controls = controlsOf(state);
     if (!selectedId || !controls) return;
-    const target = new THREE.Vector3(...galaxyLayout().positions[selectedId]);
+    const pos = layout.positions[selectedId];
+    if (!pos) return;
+    const target = new THREE.Vector3(...pos);
     const dir = state.camera.position.clone().sub(controls.target);
     if (dir.lengthSq() < 1e-6) dir.set(0, 0.5, 1);
     flyTo(target.clone().add(dir.normalize().multiplyScalar(FOCUS_DISTANCE)), target);
@@ -70,7 +76,7 @@ export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selecte
   }, [selectedId, hasControls]);
 
   useEffect(() => {
-    if (resetKey > 0) flyTo(HOME_POSITION.clone(), HOME_TARGET.clone());
+    if (resetKey > 0) flyTo(home.pos.clone(), home.target.clone());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fly only when reset is requested
   }, [resetKey]);
 
@@ -111,8 +117,8 @@ export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selecte
       flight.current = null;
       wasIgniting.current = true;
       const k = smoothstep(0.5, IGNITION.duration - 0.2, el);
-      camera.position.lerpVectors(IGNITION_FROM, HOME_POSITION, k);
-      controls.target.copy(HOME_TARGET);
+      camera.position.lerpVectors(ignitionFrom, home.pos, k);
+      controls.target.copy(home.target);
       controls.enabled = false;
       controls.autoRotate = false;
       signals.setFly(0);
@@ -122,7 +128,7 @@ export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selecte
       // Ended (or skipped): settle smoothly on the overview.
       wasIgniting.current = false;
       lastInteraction.current = now.current;
-      flyTo(HOME_POSITION.clone(), HOME_TARGET.clone());
+      flyTo(home.pos.clone(), home.target.clone());
     }
 
     const f = flight.current;

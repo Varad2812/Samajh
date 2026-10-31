@@ -58,7 +58,7 @@ function WorksheetBody({ request }: { request: WorksheetRequest }) {
             <WifiOff className="size-3" aria-hidden /> Assembled from the seeded question bank
           </span>
         ) : (
-          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">Written by Claude</span>
+          <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">Written by AI</span>
         )}
         <label className="ml-auto flex items-center gap-1.5">
           <input type="checkbox" checked={answers} onChange={(e) => setAnswers(e.target.checked)} className="accent-sky-600" /> Include answer key

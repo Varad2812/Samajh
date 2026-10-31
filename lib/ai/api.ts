@@ -8,6 +8,8 @@ import { offlineAnalysis } from "./offlineAnalyzer";
 import { finalizeAnalysis } from "./postprocess";
 import { offlineQuestion } from "./questions";
 import { offlinePlan, type StudyPlan, type StudyPlanRequest } from "./studyPlan";
+import { offlineTrack } from "@/lib/tracks/build";
+import type { CustomTestRequest, CustomTrack } from "@/lib/tracks/types";
 import type {
   AiEnvelope,
   AnalysisResult,
@@ -53,4 +55,8 @@ export const remedialWorksheet = (req: WorksheetRequest) =>
 export const studyPlan = (req: StudyPlanRequest) =>
   post<StudyPlan>("/api/study-plan", req, () => offlinePlan(req, Date.now()), 100_000);
 
-export const ai = { analyzeReasoning, generateQuestion, remedialWorksheet, studyPlan };
+/** A whole test takes a while to write; offline only the built-in physics bank can answer. */
+export const customTest = (req: CustomTestRequest) =>
+  post<CustomTrack | null>("/api/custom-test", req, () => offlineTrack(req, `trk_local${Date.now().toString(36)}`, Date.now()), 100_000);
+
+export const ai = { analyzeReasoning, generateQuestion, remedialWorksheet, studyPlan, customTest };

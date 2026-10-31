@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardCheck, History, Home, PencilLine, RefreshCw, School, type LucideIcon } from "lucide-react";
+import { ClipboardCheck, History, Home, PencilLine, RefreshCw, School, WandSparkles, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dueConceptIds, useStore, useVirtualNow } from "@/lib/store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,10 +11,13 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Extra paths that light this item. */
+  also?: string[];
 }
 
 const ITEMS: NavItem[] = [
   { href: "/student", label: "Home", icon: Home },
+  { href: "/student/create", label: "Build a test (any subject)", icon: WandSparkles, also: ["/student/test", "/student/report"] },
   { href: "/student/diagnostic", label: "Diagnostic", icon: ClipboardCheck },
   { href: "/student/practice", label: "Practice", icon: PencilLine },
   { href: "/student/review", label: "Review", icon: RefreshCw },
@@ -33,8 +36,8 @@ export function SideNav() {
       aria-label="Main"
       className="sticky top-14 flex h-[calc(100dvh-3.5rem)] w-16 shrink-0 flex-col items-center gap-1 border-r border-border bg-bg/60 py-3"
     >
-      {ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = href === "/student" ? pathname === href : pathname.startsWith(href);
+      {ITEMS.map(({ href, label, icon: Icon, also }) => {
+        const active = href === "/student" ? pathname === href : [href, ...(also ?? [])].some((p) => pathname.startsWith(p));
         const badge = href === "/student/review" && dueCount > 0 ? dueCount : null;
         return (
           <Tooltip key={href}>

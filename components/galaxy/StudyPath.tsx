@@ -5,7 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { TextSprite } from "@/components/lab/TextSprite";
-import { galaxyLayout } from "@/lib/galaxy/layout";
+import { useGalaxyLayout } from "./GraphContext";
 import { TOKENS } from "@/lib/utils";
 
 const SEGMENTS = 32;
@@ -22,7 +22,7 @@ interface Props {
  * a comet travelling along it, and a numbered marker above each stop.
  */
 export function StudyPath({ ids, reducedMotion }: Props) {
-  const { positions } = galaxyLayout();
+  const { positions } = useGalaxyLayout();
   const line = useRef<ComponentRef<typeof Line>>(null);
   const comet = useRef<THREE.Mesh>(null);
 

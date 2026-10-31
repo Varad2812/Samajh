@@ -6,9 +6,9 @@ import { Stars } from "@react-three/drei";
 import { TextSprite } from "@/components/lab/TextSprite";
 import type * as THREE from "three";
 import { useSignals } from "@/components/fx/SceneSignals";
-import { CHAPTERS, CONCEPT_BY_ID } from "@/lib/data/concepts";
 import { IGNITION } from "@/lib/galaxy/ignition";
-import { CHAPTER_COLOR, galaxyLayout, nodeRadius } from "@/lib/galaxy/layout";
+import { nodeRadius } from "@/lib/galaxy/layout";
+import { useGalaxyGraph, useGalaxyLayout } from "./GraphContext";
 import { fmt2, masteryColor, TOKENS } from "@/lib/utils";
 import type { GalaxyNodeData } from "./types";
 
@@ -28,19 +28,20 @@ export function Starfield({ reducedMotion, count = 3500 }: { reducedMotion: bool
 
 /** Chapter names floating above each cluster (canvas-texture sprites, faded out during Ignition). */
 export function ClusterLabels({ hidden = false }: { hidden?: boolean }) {
-  const { clusterCenters } = galaxyLayout();
+  const { chapters } = useGalaxyGraph();
+  const { clusterCenters } = useGalaxyLayout();
   return (
     <>
-      {CHAPTERS.map((ch) => {
+      {chapters.map((ch) => {
         const [x, y, z] = clusterCenters[ch.id];
         return (
           <TextSprite
             key={ch.id}
-            text={(ch.short === "Elec" ? "Electricity" : ch.short === "Mag" ? "Magnetism" : ch.short).toUpperCase()}
+            text={ch.label.toUpperCase()}
             position={[x, y + 2.6, z]}
             height={0.026}
             screenSpace
-            color={CHAPTER_COLOR[ch.id]}
+            color={ch.color}
             background={null}
             weight={500}
             opacity={hidden ? 0 : 0.85}
@@ -53,9 +54,10 @@ export function ClusterLabels({ hidden = false }: { hidden?: boolean }) {
 
 /** Label of the selected node, as a canvas-texture sprite (no DOM). */
 export function SelectedLabel({ id, data }: { id: string | null; data: GalaxyNodeData | null }) {
-  const { positions } = galaxyLayout();
-  if (!id || !data) return null;
-  const concept = CONCEPT_BY_ID[id];
+  const graph = useGalaxyGraph();
+  const { positions } = useGalaxyLayout();
+  const concept = id ? graph.byId[id] : undefined;
+  if (!id || !data || !concept || !positions[id]) return null;
   const [x, y, z] = positions[id];
   return (
     <TextSprite

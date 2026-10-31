@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, CircleAlert, ClipboardCheck, FastForward, LogIn, LogOut, PlayCircle, RotateCcw, Sparkles, UserPlus, XCircle, type LucideIcon } from "lucide-react";
+import { CheckCircle2, CircleAlert, ClipboardCheck, FastForward, FileCheck2, LogIn, LogOut, PlayCircle, RotateCcw, Sparkles, UserPlus, WandSparkles, XCircle, type LucideIcon } from "lucide-react";
 import { fetchLogs, useAccount, type LogRow } from "@/lib/account";
 import { conceptName } from "@/lib/ai/studyPlan";
 import { MISCONCEPTION_BY_ID } from "@/lib/data/misconceptions";
@@ -9,6 +9,8 @@ import { cn, fmt2, masteryColor, pct } from "@/lib/utils";
 
 const KINDS: Record<string, { label: string; icon: LucideIcon; tone: string }> = {
   attempt: { label: "Attempts", icon: CheckCircle2, tone: "text-proficient" },
+  custom_test_created: { label: "Tests built", icon: WandSparkles, tone: "text-accent" },
+  custom_test_done: { label: "Tests taken", icon: FileCheck2, tone: "text-mastered" },
   study_plan: { label: "Video plans", icon: Sparkles, tone: "text-accent" },
   video_done: { label: "Videos watched", icon: PlayCircle, tone: "text-accent-2" },
   diagnostic: { label: "Diagnostics", icon: ClipboardCheck, tone: "text-mastered" },
@@ -34,6 +36,13 @@ function describe(row: LogRow): { title: string; detail: string } {
     }
     case "study_plan":
       return { title: `45-min plan · ${num(p.videos) ?? 0} videos`, detail: `${Array.isArray(p.topics) ? p.topics.join(", ") : ""} · ${p.source === "ai" ? `Gemini, ${num(p.verified) ?? 0} verified links` : "offline plan"}` };
+    case "custom_test_created":
+      return { title: `Built: ${str(p.title) || "custom test"}`, detail: `${str(p.subject)} · Class ${str(p.standard)} · ${num(p.questions) ?? 0} questions · ${p.source === "ai" ? "written by AI" : "built-in bank"}` };
+    case "custom_test_done": {
+      const total = num(p.total) ?? 0;
+      const correct = num(p.correct) ?? 0;
+      return { title: `Took: ${str(p.title) || "custom test"} · ${total ? Math.round((correct / total) * 100) : 0}%`, detail: `${correct}/${total} correct · ${str(p.subject)} · Class ${str(p.standard)}` };
+    }
     case "video_done":
       return { title: str(p.title), detail: `${conceptName(str(p.conceptId))} · ${num(p.minutes) ?? 0} min` };
     case "fast_forward":

@@ -5,27 +5,27 @@ import { useFrame } from "@react-three/fiber";
 import { Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import { useSignals } from "@/components/fx/SceneSignals";
-import { CHAPTERS } from "@/lib/data/concepts";
 import { IGNITION, smoothstep } from "@/lib/galaxy/ignition";
-import { CHAPTER_COLOR, galaxyLayout } from "@/lib/galaxy/layout";
+import { useGalaxyGraph, useGalaxyLayout } from "./GraphContext";
 import { NEBULA_FRAGMENT, NEBULA_VERTEX } from "@/lib/shaders/nebula.glsl";
 
 const OPACITY = 0.5;
 
 /** One drifting fbm nebula per chapter cluster, additive and faint (DESIGN.md §4.1). */
 export function Nebulae({ size = 11, reducedMotion }: { size?: number; reducedMotion: boolean }) {
-  const { clusterCenters } = galaxyLayout();
+  const { chapters } = useGalaxyGraph();
+  const { clusterCenters } = useGalaxyLayout();
   const signals = useSignals();
   const materials = useRef<(THREE.ShaderMaterial | null)[]>([]);
   const uniforms = useMemo(
     () =>
-      CHAPTERS.map((ch, i) => ({
-        uColor: { value: new THREE.Color(CHAPTER_COLOR[ch.id]) },
+      chapters.map((ch, i) => ({
+        uColor: { value: new THREE.Color(ch.color) },
         uTime: { value: 0 },
         uOpacity: { value: OPACITY },
         uSeed: { value: i * 3.7 },
       })),
-    [],
+    [chapters],
   );
 
   useFrame((state) => {
@@ -41,7 +41,7 @@ export function Nebulae({ size = 11, reducedMotion }: { size?: number; reducedMo
 
   return (
     <>
-      {CHAPTERS.map((ch, i) => (
+      {chapters.map((ch, i) => (
         <Billboard key={ch.id} position={clusterCenters[ch.id]}>
           <mesh renderOrder={-1}>
             <planeGeometry args={[size, size]} />

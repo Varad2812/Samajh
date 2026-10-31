@@ -6,10 +6,13 @@ import { OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { SkipForward } from "lucide-react";
 import { IgnitionDirector } from "@/components/fx/IgnitionDirector";
 import { QualityContext, SceneSignals, SignalsContext } from "@/components/fx/SceneSignals";
+import { PHYSICS_GRAPH } from "@/lib/galaxy/graph";
 import { IGNITION } from "@/lib/galaxy/ignition";
 import { useStore } from "@/lib/store";
-import { BASE_FOV, CameraRig, HOME_POSITION } from "./CameraRig";
+import { galaxyLayout } from "@/lib/galaxy/layout";
+import { BASE_FOV, CameraRig } from "./CameraRig";
 import { GalaxyScene } from "./GalaxyScene";
+import { GalaxyGraphContext } from "./GraphContext";
 import { StudyPath } from "./StudyPath";
 import type { GalaxyProps } from "./types";
 import { usePerformanceFallback } from "./usePerformanceFallback";
@@ -48,7 +51,7 @@ function useIgnition(signals: SceneSignals, reducedMotion: boolean) {
   return { ignitionId, igniting, skip };
 }
 
-export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, highlightIds = null, pathIds = null, resetKey = 0, igniteOnMount = false, children }: GalaxyProps) {
+export default function KnowledgeGalaxyCanvas({ nodes, graph = PHYSICS_GRAPH, selectedId, onSelect, highlightIds = null, pathIds = null, resetKey = 0, igniteOnMount = false, children }: GalaxyProps) {
   const reducedMotion = useReducedMotion();
   const [signals] = useState(() => new SceneSignals());
   const perf = usePerformanceFallback();
@@ -59,7 +62,7 @@ export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, hig
     <>
       <Canvas
         dpr={perf.quality.low ? 1 : [1, 2]}
-        camera={{ position: HOME_POSITION.toArray(), fov: BASE_FOV, near: 0.1, far: 200 }}
+        camera={{ position: galaxyLayout(graph).home.position, fov: BASE_FOV, near: 0.1, far: 200 }}
         gl={{ antialias: false, powerPreference: "high-performance" }}
         onPointerDown={() => igniting && skip()}
         onPointerMissed={() => onSelect?.(null)}
@@ -68,6 +71,7 @@ export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, hig
         aria-label="Knowledge Galaxy: 3D map of concepts coloured by mastery"
         data-quality={perf.quality.low ? "low" : "high"}
       >
+        <GalaxyGraphContext.Provider value={graph}>
         <SignalsContext.Provider value={signals}>
           <QualityContext.Provider value={perf.quality}>
             <PerformanceMonitor bounds={perf.bounds} flipflops={3} onDecline={perf.onDecline} onIncline={perf.onIncline} onFallback={perf.onFallback} />
@@ -87,6 +91,7 @@ export default function KnowledgeGalaxyCanvas({ nodes, selectedId, onSelect, hig
             <CameraRig selectedId={selectedId} resetKey={resetKey} reducedMotion={reducedMotion} />
           </QualityContext.Provider>
         </SignalsContext.Provider>
+        </GalaxyGraphContext.Provider>
       </Canvas>
       {igniting && (
         <button

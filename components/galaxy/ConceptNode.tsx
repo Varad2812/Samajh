@@ -7,16 +7,17 @@ import { TextSprite } from "@/components/lab/TextSprite";
 import * as THREE from "three";
 import { glowTexture } from "@/components/fx/glowTexture";
 import { useSignals } from "@/components/fx/SceneSignals";
-import type { Concept } from "@/lib/data/concepts";
 import { MASTERED } from "@/lib/fx";
+import type { GraphConcept } from "@/lib/galaxy/graph";
 import { igniteAt, smoothstep } from "@/lib/galaxy/ignition";
 import { nodeRadius, type Vec3 } from "@/lib/galaxy/layout";
 import { NODE_FRAGMENT, NODE_VERTEX } from "@/lib/shaders/node.glsl";
 import { fmt2, masteryColor, TOKENS } from "@/lib/utils";
+import { useGalaxyGraph } from "./GraphContext";
 import type { GalaxyNodeData } from "./types";
 
 interface Props {
-  concept: Concept;
+  concept: GraphConcept;
   position: Vec3;
   data: GalaxyNodeData;
   selected: boolean;
@@ -39,6 +40,7 @@ const DASHED_RING = Array.from({ length: 65 }, (_, i) => {
 
 export function ConceptNode({ concept, position, data, selected, dimmed, reducedMotion, compact = false, boostAt, satelliteAt, onSelect }: Props) {
   const r = nodeRadius(concept.weight);
+  const graph = useGalaxyGraph();
   const signals = useSignals();
   const reveal = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
@@ -58,7 +60,7 @@ export function ConceptNode({ concept, position, data, selected, dimmed, reduced
     uRim: { value: 1.5 },
   }));
   const scaleTarget = useMemo(() => new THREE.Vector3(1, 1, 1), []);
-  const igniteTime = igniteAt(concept.id);
+  const igniteTime = igniteAt(concept.id, graph);
   const seed = concept.id.charCodeAt(1) * 1.37 + concept.id.length;
 
   useEffect(() => () => void (document.body.style.cursor = "auto"), []);

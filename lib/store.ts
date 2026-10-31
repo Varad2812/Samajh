@@ -10,6 +10,7 @@ import { INITIAL_THETA } from "@/lib/engine/elo";
 import { DEMO_STUDENT_ID, generateClass, generateDemoStudent } from "@/lib/data/students";
 import { appendFx, misconceptionFx, shockwaveFor, type FxEvent, type FxInput } from "@/lib/fx";
 import type { StudyPlan } from "@/lib/ai/studyPlan";
+import type { CustomTrack, TrackResult } from "@/lib/tracks/types";
 import type { Question } from "@/lib/data/questions";
 import type { AttemptOutcome } from "@/lib/engine/attempt";
 import type { DiagnosticOutcome } from "@/lib/engine/diagnostic";
@@ -48,6 +49,13 @@ interface SamajhState {
   questionElo: Record<string, number>;
   /** Latest 45-minute YouTube plan for the weakest concepts. */
   studyPlan: StudyPlan | null;
+  /** Custom tests the student built (newest first). */
+  tracks: CustomTrack[];
+  /** Latest result per custom test. */
+  trackResults: Record<string, TrackResult>;
+  /** 45-minute video plan per custom test. */
+  trackPlans: Record<string, StudyPlan>;
+  activeTrackId: string | null;
   /** Transient 3D effect events (not persisted). */
   fx: FxEvent[];
   fxSeq: number;
@@ -73,6 +81,12 @@ interface SamajhState {
   resetDemo: () => void;
   setStudyPlan: (plan: StudyPlan | null) => void;
   toggleStudyItem: (itemId: string) => void;
+  addTrack: (track: CustomTrack) => void;
+  removeTrack: (trackId: string) => void;
+  setActiveTrack: (trackId: string | null) => void;
+  saveTrackResult: (result: TrackResult) => void;
+  setTrackPlan: (trackId: string, plan: StudyPlan) => void;
+  toggleTrackPlanItem: (trackId: string, itemId: string) => void;
   /** Replace progress with an account's saved snapshot (or a fresh profile for a new account). */
   loadAccount: (account: { name: string; role: Role }, saved: Partial<PersistedState> | null) => void;
 }
@@ -80,7 +94,18 @@ interface SamajhState {
 /** The slices saved to localStorage and to the account database. */
 export type PersistedState = Pick<
   SamajhState,
-  "student" | "attempts" | "mastery" | "schedule" | "settings" | "generated" | "questionElo" | "studyPlan"
+  | "student"
+  | "attempts"
+  | "mastery"
+  | "schedule"
+  | "settings"
+  | "generated"
+  | "questionElo"
+  | "studyPlan"
+  | "tracks"
+  | "trackResults"
+  | "trackPlans"
+  | "activeTrackId"
 >;
 
 export const persistedSlice = (s: SamajhState): PersistedState => ({
@@ -92,9 +117,13 @@ export const persistedSlice = (s: SamajhState): PersistedState => ({
   generated: s.generated,
   questionElo: s.questionElo,
   studyPlan: s.studyPlan,
+  tracks: s.tracks,
+  trackResults: s.trackResults,
+  trackPlans: s.trackPlans,
+  activeTrackId: s.activeTrackId,
 });
 
-const freshMastery = (): Record<string, ConceptMastery> =>
+export const freshMastery = (): Record<string, ConceptMastery> =>
   Object.fromEntries(
     CONCEPTS.map((c) => [c.id, { p: DEFAULT_P_INIT, estimated: true, suspect: false, history: [] }]),
   );
@@ -108,7 +137,13 @@ const initialData = () => ({
   generated: [] as Question[],
   questionElo: {} as Record<string, number>,
   studyPlan: null as StudyPlan | null,
+  tracks: [] as CustomTrack[],
+  trackResults: {} as Record<string, TrackResult>,
+  trackPlans: {} as Record<string, StudyPlan>,
+  activeTrackId: null as string | null,
 });
+
+const MAX_TRACKS = 12;
 
 export const useStore = create<SamajhState>()(
   persist(
@@ -171,7 +206,8 @@ export const useStore = create<SamajhState>()(
             ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()),
           };
         }),
-      resetDemo: () => set((s) => ({ ...initialData(), student: { ...initialData().student, name: s.student.name } })),
+      // Clears progress and the clock; the student's own custom tests stay (their results go).
+      resetDemo: () => set((s) => ({ ...initialData(), student: { ...initialData().student, name: s.student.name }, tracks: s.tracks })),
       setStudyPlan: (plan) => set({ studyPlan: plan }),
       toggleStudyItem: (itemId) =>
         set((s) =>
@@ -179,6 +215,24 @@ export const useStore = create<SamajhState>()(
             ? { studyPlan: { ...s.studyPlan, items: s.studyPlan.items.map((v) => (v.id === itemId ? { ...v, done: !v.done } : v)) } }
             : {},
         ),
+      addTrack: (track) => set((s) => ({ tracks: [track, ...s.tracks.filter((t) => t.id !== track.id)].slice(0, MAX_TRACKS), activeTrackId: track.id })),
+      removeTrack: (trackId) =>
+        set((s) => {
+          const { [trackId]: _r, ...trackResults } = s.trackResults;
+          const { [trackId]: _p, ...trackPlans } = s.trackPlans;
+          void _r;
+          void _p;
+          return { tracks: s.tracks.filter((t) => t.id !== trackId), trackResults, trackPlans, activeTrackId: s.activeTrackId === trackId ? null : s.activeTrackId };
+        }),
+      setActiveTrack: (trackId) => set({ activeTrackId: trackId }),
+      saveTrackResult: (result) => set((s) => ({ trackResults: { ...s.trackResults, [result.trackId]: result } })),
+      setTrackPlan: (trackId, plan) => set((s) => ({ trackPlans: { ...s.trackPlans, [trackId]: plan } })),
+      toggleTrackPlanItem: (trackId, itemId) =>
+        set((s) => {
+          const plan = s.trackPlans[trackId];
+          if (!plan) return {};
+          return { trackPlans: { ...s.trackPlans, [trackId]: { ...plan, items: plan.items.map((v) => (v.id === itemId ? { ...v, done: !v.done } : v)) } } };
+        }),
       loadAccount: (account, saved) =>
         set((s) => {
           const base = initialData();

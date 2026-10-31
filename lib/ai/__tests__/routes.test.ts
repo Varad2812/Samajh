@@ -67,6 +67,8 @@ const MODEL_WORKSHEET = {
 beforeEach(() => {
   create.mockReset();
   vi.stubEnv("ANTHROPIC_API_KEY", "");
+  // Without Claude the routes would use Gemini; these tests cover the offline path.
+  vi.stubEnv("GEMINI_API_KEY", "");
 });
 afterEach(() => {
   vi.unstubAllEnvs();

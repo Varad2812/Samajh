@@ -1,8 +1,8 @@
 "use client";
 
-import { CONCEPT_BY_ID } from "@/lib/data/concepts";
 import type { FxEvent } from "@/lib/fx";
-import { galaxyLayout, nodeRadius, RING_TILT } from "@/lib/galaxy/layout";
+import { useGalaxyGraph, useGalaxyLayout } from "@/components/galaxy/GraphContext";
+import { nodeRadius, RING_TILT } from "@/lib/galaxy/layout";
 import { TOKENS } from "@/lib/utils";
 import { Burst } from "./Burst";
 import { MasteryShockwave } from "./MasteryShockwave";
@@ -10,15 +10,17 @@ import { MisconceptionStrike } from "./MisconceptionStrike";
 
 /** Renders the per-concept effects (strike, shatter, shockwave) for fresh store events. */
 export function FxLayer({ events, reducedMotion }: { events: FxEvent[]; reducedMotion: boolean }) {
+  const graph = useGalaxyGraph();
+  const { positions } = useGalaxyLayout();
   if (reducedMotion) return null;
-  const { positions } = galaxyLayout();
   return (
     <>
       {events.map((e) => {
         if (e.kind === "ignition") return null;
         const pos = positions[e.conceptId];
-        const r = nodeRadius(CONCEPT_BY_ID[e.conceptId].weight);
-        if (!pos) return null;
+        const concept = graph.byId[e.conceptId];
+        if (!pos || !concept) return null;
+        const r = nodeRadius(concept.weight);
         switch (e.kind) {
           case "strike":
             return <MisconceptionStrike key={e.id} target={pos} nodeRadius={r} seed={e.id} />;

@@ -16,16 +16,25 @@ const CONCEPT_BY_ID: Record<string, Concept> = Object.fromEntries(CONCEPTS.map((
 
 // ───────────── Schemas ─────────────
 
-export const studyTopicSchema = z.object({
-  conceptId: z.string().refine((id) => id in CONCEPT_BY_ID, "unknown concept"),
-  p: z.number().min(0).max(1),
-  misconceptions: z.array(z.string()).max(10).default([]),
-});
+export const studyTopicSchema = z
+  .object({
+    conceptId: z.string().min(1).max(40),
+    /** Required for topics outside the built-in physics graph (custom tests). */
+    name: z.string().max(90).optional(),
+    prereqs: z.array(z.string()).max(12).optional(),
+    p: z.number().min(0).max(1),
+    /** Physics misconception ids, or free-text beliefs from a custom test's wrong answers. */
+    misconceptions: z.array(z.string().max(300)).max(10).default([]),
+  })
+  .refine((t) => t.conceptId in CONCEPT_BY_ID || Boolean(t.name), "unknown concept needs a name");
 export type StudyTopicInput = z.infer<typeof studyTopicSchema>;
 
 export const studyPlanRequestSchema = z.object({
   topics: z.array(studyTopicSchema).min(1).max(MAX_TOPICS),
   budgetMinutes: z.number().int().min(15).max(120).default(PLAN_MINUTES),
+  /** Custom tests: what the topics belong to (default: CBSE Class 10 Physics). */
+  subject: z.string().max(60).optional(),
+  standard: z.string().max(40).optional(),
 });
 export type StudyPlanRequest = z.infer<typeof studyPlanRequestSchema>;
 
@@ -66,7 +75,7 @@ export interface StudyPlan {
   source: "ai" | "offline";
   budgetMinutes: number;
   totalMinutes: number;
-  topics: { conceptId: string; minutes: number; p: number }[];
+  topics: { conceptId: string; minutes: number; p: number; name?: string }[];
   items: StudyVideo[];
 }
 
@@ -98,24 +107,29 @@ export function pickWeakTopics(
   }));
 }
 
-function ancestors(id: string, seen = new Set<string>()): Set<string> {
-  for (const pre of CONCEPT_BY_ID[id]?.prereqs ?? []) {
+type PrereqLookup = (id: string) => string[];
+const physicsPrereqs: PrereqLookup = (id) => CONCEPT_BY_ID[id]?.prereqs ?? [];
+
+function ancestors(id: string, lookup: PrereqLookup, seen = new Set<string>()): Set<string> {
+  for (const pre of lookup(id)) {
     if (!seen.has(pre)) {
       seen.add(pre);
-      ancestors(pre, seen);
+      ancestors(pre, lookup, seen);
     }
   }
   return seen;
 }
 
-/** Prerequisites first; otherwise keep the weakness ranking. */
-export function orderByPrereqs<T extends { conceptId: string }>(topics: T[]): T[] {
+/** Prerequisites first (topic-supplied prereqs win over the physics graph); otherwise keep the weakness ranking. */
+export function orderByPrereqs<T extends { conceptId: string; prereqs?: string[] }>(topics: T[]): T[] {
+  const given = new Map(topics.filter((t) => t.prereqs).map((t) => [t.conceptId, t.prereqs ?? []]));
+  const lookup: PrereqLookup = (id) => given.get(id) ?? physicsPrereqs(id);
   const ids = new Set(topics.map((t) => t.conceptId));
   const placed = new Set<string>();
   const out: T[] = [];
   const pending = [...topics];
   while (pending.length) {
-    const i = pending.findIndex((t) => [...ancestors(t.conceptId)].every((a) => !ids.has(a) || placed.has(a)));
+    const i = pending.findIndex((t) => [...ancestors(t.conceptId, lookup)].every((a) => !ids.has(a) || placed.has(a)));
     const [next] = pending.splice(Math.max(0, i), 1);
     placed.add(next.conceptId);
     out.push(next);
@@ -156,23 +170,28 @@ export const watchUrl = (videoId: string) => `https://www.youtube.com/watch?v=${
 // ───────────── Plan assembly ─────────────
 
 export const conceptName = (id: string) => CONCEPT_BY_ID[id]?.name ?? id;
+const topicName = (t: StudyTopicInput) => t.name || conceptName(t.conceptId);
+/** A physics misconception id → its label, else the free-text belief itself. */
+const beliefText = (m: string, field: "label" | "wrongBelief") => MISCONCEPTION_BY_ID[m]?.[field] ?? m;
+const audience = (req: StudyPlanRequest) => (req.subject ? `${req.standard ?? ""} ${req.subject}`.trim() : "class 10 physics CBSE");
 
 /** Deterministic plan: one search per topic, split in two (concept + exam numericals) for long slots. */
 export function offlinePlan(req: StudyPlanRequest, at: number): StudyPlan {
   const topics = orderByPrereqs(req.topics);
   const minutes = allocateMinutes(topics, req.budgetMinutes);
   const items: StudyVideo[] = topics.flatMap((t, i) => {
-    const name = conceptName(t.conceptId);
-    const mcs = t.misconceptions.map((id) => MISCONCEPTION_BY_ID[id]?.label).filter(Boolean);
-    const why = mcs.length ? `Clears up: ${mcs.join(", ")}.` : `Mastery ${Math.round(t.p * 100)}%: rebuild the core idea.`;
+    const name = topicName(t);
+    const who = audience(req);
+    const mcs = t.misconceptions.map((m) => beliefText(m, "label")).filter(Boolean);
+    const why = mcs.length ? `Clears up: ${mcs.slice(0, 2).join("; ")}` : `Mastery ${Math.round(t.p * 100)}%: rebuild the core idea.`;
     const base = { conceptId: t.conceptId, channel: "YouTube search", videoId: null, done: false };
     if (minutes[i] < 14) {
-      return [{ ...base, id: `${t.conceptId}-0`, title: `${name}: Class 10 explanation`, minutes: minutes[i], why, url: youtubeSearchUrl(`${name} class 10 physics CBSE`) }];
+      return [{ ...base, id: `${t.conceptId}-0`, title: `${name}: explained`, minutes: minutes[i], why, url: youtubeSearchUrl(`${name} ${who}`) }];
     }
     const first = Math.ceil(minutes[i] * 0.6);
     return [
-      { ...base, id: `${t.conceptId}-0`, title: `${name}: concept explained`, minutes: first, why, url: youtubeSearchUrl(`${name} class 10 physics CBSE explanation`) },
-      { ...base, id: `${t.conceptId}-1`, title: `${name}: board exam questions`, minutes: minutes[i] - first, why: "Practise the exam-style questions.", url: youtubeSearchUrl(`${name} class 10 numericals PYQ`) },
+      { ...base, id: `${t.conceptId}-0`, title: `${name}: concept explained`, minutes: first, why, url: youtubeSearchUrl(`${name} ${who} explanation`) },
+      { ...base, id: `${t.conceptId}-1`, title: `${name}: exam questions`, minutes: minutes[i] - first, why: "Practise the exam-style questions.", url: youtubeSearchUrl(`${name} ${who} important questions`) },
     ];
   });
   return finishPlan(req, topics, minutes, items, at, "offline");
@@ -227,7 +246,7 @@ function finishPlan(
     source,
     budgetMinutes: req.budgetMinutes,
     totalMinutes: items.reduce((s, v) => s + v.minutes, 0),
-    topics: topics.map((t, i) => ({ conceptId: t.conceptId, minutes: minutes[i], p: t.p })),
+    topics: topics.map((t, i) => ({ conceptId: t.conceptId, minutes: minutes[i], p: t.p, name: topicName(t) })),
     items,
   };
 }
@@ -238,15 +257,17 @@ export function studyPlanPrompt(req: StudyPlanRequest): { system: string; user: 
   const minutes = allocateMinutes(topics, req.budgetMinutes);
   const lines = topics.map((t, i) => {
     const c = CONCEPT_BY_ID[t.conceptId];
-    const mcs = t.misconceptions.map((id) => MISCONCEPTION_BY_ID[id]).filter(Boolean);
-    const mcText = mcs.length ? ` Misconceptions to fix: ${mcs.map((m) => `"${m.wrongBelief}"`).join("; ")}.` : "";
-    return `${i + 1}. [${c.id}] ${c.name} (mastery ${Math.round(t.p * 100)}%, ${minutes[i]} min). ${c.summary}${mcText}`;
+    const summary = t.name ? "" : ` ${c?.summary ?? ""}`;
+    const mcs = t.misconceptions.map((m) => beliefText(m, "wrongBelief")).filter(Boolean);
+    const mcText = mcs.length ? ` Misconceptions to fix: ${mcs.map((m) => `"${m}"`).join("; ")}.` : "";
+    return `${i + 1}. [${t.conceptId}] ${topicName(t)} (mastery ${Math.round(t.p * 100)}%, ${minutes[i]} min).${summary}${mcText}`;
   });
+  const who = req.subject ? `${req.standard ?? ""} ${req.subject}`.trim() : "Indian CBSE Class 10 Physics";
   return {
     system:
-      "You build YouTube study playlists for Indian CBSE Class 10 Physics students. Use Google Search to find REAL, " +
-      "currently available YouTube videos (prefer well-known channels such as Physics Wallah, Magnet Brains, Vedantu, " +
-      "Khan Academy India, LearnoHub, BYJU'S). Never invent a URL: if you are not sure a video exists, set url to an " +
+      `You build YouTube study playlists for ${who} students. Use Google Search to find REAL, ` +
+      "currently available YouTube videos from well-known educational channels (for Indian school syllabi e.g. Physics Wallah, " +
+      "Magnet Brains, Vedantu, Khan Academy, LearnoHub, BYJU'S). Never invent a URL: if you are not sure a video exists, set url to an " +
       'empty string. Reply with strict JSON only, no prose: {"items":[{"conceptId","title","channel","url","minutes","why"}]}.',
     user:
       `Make a ${req.budgetMinutes}-minute plan. Keep the topics in this order (prerequisites come first) and keep each ` +

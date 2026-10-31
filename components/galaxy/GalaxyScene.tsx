@@ -4,11 +4,10 @@ import { useMemo } from "react";
 import { FxLayer } from "@/components/fx/FxLayer";
 import { PostStack } from "@/components/fx/PostStack";
 import { useFreshFx } from "@/components/fx/useFreshFx";
-import { CONCEPTS, dependentsOf } from "@/lib/data/concepts";
 import { STRIKE_IMPACT_MS } from "@/lib/fx";
-import { galaxyLayout } from "@/lib/galaxy/layout";
 import { TOKENS } from "@/lib/utils";
 import { ConceptNode } from "./ConceptNode";
+import { useGalaxyGraph, useGalaxyLayout } from "./GraphContext";
 import { Dust } from "./Dust";
 import { Nebulae } from "./Nebulae";
 import { PrereqEdges } from "./PrereqEdges";
@@ -31,7 +30,8 @@ interface Props {
 
 /** Scene contents shared by KnowledgeGalaxy and MiniGalaxy. */
 export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedMotion, compact = false, igniting = false, onSelect }: Props) {
-  const { positions } = galaxyLayout();
+  const graph = useGalaxyGraph();
+  const { positions } = useGalaxyLayout();
   const events = useFreshFx();
 
   // Shockwaves briefly brighten the concept's dependents; strikes reveal the new satellite at impact.
@@ -41,11 +41,11 @@ export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedM
     for (const e of events) {
       if (e.kind === "shockwave") {
         boost[e.conceptId] = e.at;
-        for (const d of dependentsOf(e.conceptId)) boost[d.id] = e.at;
+        for (const d of graph.concepts) if (d.prereqs.includes(e.conceptId)) boost[d.id] = e.at;
       } else if (e.kind === "strike") sat[e.conceptId] = e.at + (reducedMotion ? 0 : STRIKE_IMPACT_MS);
     }
     return { boostAt: boost, satelliteAt: sat };
-  }, [events, reducedMotion]);
+  }, [events, reducedMotion, graph]);
 
   return (
     <>
@@ -54,7 +54,7 @@ export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedM
       <Dust reducedMotion={reducedMotion} sizeScale={compact ? 0.3 : 1} />
       <Nebulae reducedMotion={reducedMotion} size={compact ? 9 : 11} />
       <PrereqEdges nodes={nodes} activeIds={activeIds} reducedMotion={reducedMotion} />
-      {CONCEPTS.map((c) => (
+      {graph.concepts.filter((c) => nodes[c.id]).map((c) => (
         <ConceptNode
           key={c.id}
           concept={c}

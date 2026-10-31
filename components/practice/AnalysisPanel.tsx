@@ -58,7 +58,7 @@ export function AnalysisPanel({ raw, analysis, source, question, selectedIndex, 
         <h2 className="label-caps">Analysis</h2>
         <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]", source === "ai" ? "bg-accent/10 text-accent" : "bg-developing/10 text-developing")}>
           {source === "ai" ? <Cpu className="size-3" aria-hidden /> : <WifiOff className="size-3" aria-hidden />}
-          {source === "ai" ? "Claude analysis" : "Built-in analyzer"}
+          {source === "ai" ? "AI analysis" : "Built-in analyzer"}
         </span>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">

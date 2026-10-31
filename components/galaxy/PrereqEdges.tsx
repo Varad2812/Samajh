@@ -5,7 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useSignals } from "@/components/fx/SceneSignals";
 import { igniteAt } from "@/lib/galaxy/ignition";
-import { galaxyLayout } from "@/lib/galaxy/layout";
+import { useGalaxyGraph, useGalaxyLayout } from "./GraphContext";
 import { EDGE_FRAGMENT, EDGE_VERTEX } from "@/lib/shaders/edge.glsl";
 import { masteryColor, TOKENS } from "@/lib/utils";
 import type { GalaxyNodes } from "./types";
@@ -32,7 +32,8 @@ function curveFor(a: THREE.Vector3, b: THREE.Vector3): THREE.QuadraticBezierCurv
  * brightness = prereq mastery, plus one travelling spark per edge. Ignition draws each edge progressively.
  */
 export function PrereqEdges({ nodes, activeIds, reducedMotion }: Props) {
-  const { positions, edges } = galaxyLayout();
+  const graph = useGalaxyGraph();
+  const { positions, edges } = useGalaxyLayout();
   const signals = useSignals();
   const material = useRef<THREE.ShaderMaterial>(null);
   const sparks = useRef<THREE.InstancedMesh>(null);
@@ -64,7 +65,7 @@ export function PrereqEdges({ nodes, activeIds, reducedMotion }: Props) {
           idx[v] = e;
           bright[v] = nodes[a].estimated ? 0.15 : nodes[a].p;
           active[v] = isActive;
-          ignite.set([igniteAt(a), igniteAt(b)], v * 2);
+          ignite.set([igniteAt(a, graph), igniteAt(b, graph)], v * 2);
           v++;
         }
       }
@@ -79,7 +80,7 @@ export function PrereqEdges({ nodes, activeIds, reducedMotion }: Props) {
     g.setAttribute("aActive", new THREE.BufferAttribute(active, 1));
     g.setAttribute("aIgnite", new THREE.BufferAttribute(ignite, 2));
     return g;
-  }, [edges, curves, nodes, activeIds]);
+  }, [edges, curves, nodes, activeIds, graph]);
   useLayoutEffect(() => () => geometry.dispose(), [geometry]);
 
   const uniforms = useMemo(() => ({ uTime: { value: 0 }, uIgnite: { value: 1000 }, uAccent: { value: new THREE.Color(TOKENS.accent) } }), []);
@@ -106,7 +107,7 @@ export function PrereqEdges({ nodes, activeIds, reducedMotion }: Props) {
     if (!mesh) return;
     edges.forEach(([, b], i) => {
       // Sparks appear once the edge has finished drawing.
-      const drawn = el === Infinity || el > igniteAt(b);
+      const drawn = el === Infinity || el > igniteAt(b, graph);
       const k = (((reducedMotion ? 0 : t) * SPEED + i * 0.137) % 1 + 1) % 1;
       dummy.position.copy(curves[i].getPoint(k));
       dummy.scale.setScalar(drawn ? 0.4 + 0.6 * Math.sin(k * Math.PI) : 0);

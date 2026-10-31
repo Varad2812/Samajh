@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Crosshair, RefreshCw, Sparkles, Target } from "lucide-react";
+import { ArrowRight, Crosshair, RefreshCw, Sparkles, Target, WandSparkles } from "lucide-react";
 import { CONCEPT_BY_ID, CONCEPTS } from "@/lib/data/concepts";
 import { rootCauseOf } from "@/lib/engine/rootCause";
 import { selectNext } from "@/lib/engine/selector";
@@ -55,10 +55,13 @@ export function TodayPlan({ mastery, schedule, attempts, theta, misconceptions, 
 
       {!diagnosticDone && measured.length === 0 ? (
         <div className="flex flex-col gap-2 rounded-lg border border-accent/20 bg-accent/5 p-3 text-xs text-muted-foreground">
-          Every star is still an estimate (.30). A 12-question diagnostic lights up your galaxy.
-          <div className="flex gap-2">
+          Every star is still an estimate (.30). A 12-question diagnostic lights up your galaxy, or build a test for any subject you study.
+          <div className="flex flex-wrap gap-2">
             <Link href="/student/diagnostic" className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 font-medium text-bg hover:bg-accent/90">
               Start diagnostic <ArrowRight className="size-3" aria-hidden />
+            </Link>
+            <Link href="/student/create" className="inline-flex items-center gap-1 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-foreground hover:bg-accent/20">
+              <WandSparkles className="size-3" aria-hidden /> Build my own test
             </Link>
             <button onClick={onLoadDemo} className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-foreground hover:border-accent/40">
               <Sparkles className="size-3" aria-hidden /> Demo profile

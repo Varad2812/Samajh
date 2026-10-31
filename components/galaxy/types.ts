@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
+import type { GalaxyGraph } from "@/lib/galaxy/graph";
 import type { GalaxyNodes } from "@/lib/galaxy/nodes";
 
 export type { GalaxyNodeData, GalaxyNodes } from "@/lib/galaxy/nodes";
 
 export interface GalaxyProps {
   nodes: GalaxyNodes;
+  /** Concept graph to draw (default: Class 10 Physics). */
+  graph?: GalaxyGraph;
   selectedId: string | null;
   onSelect?: (id: string | null) => void;
   /** Search matches; non-matching nodes dim. null = no filter. */
@@ -21,6 +24,7 @@ export interface GalaxyProps {
 
 export interface MiniGalaxyProps {
   nodes: GalaxyNodes;
+  graph?: GalaxyGraph;
   focusId: string;
   onSelect?: (id: string) => void;
   className?: string;

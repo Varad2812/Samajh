@@ -1,17 +1,20 @@
 /**
  * Server-only Claude wrapper (CLAUDE.md "AI calls"): strict JSON validated by zod, 8 s timeout, one retry.
- * Never imported by client code; the key stays in process.env.
+ * Without ANTHROPIC_API_KEY it uses Gemini (GEMINI_API_KEY) with the same schema and checks.
+ * Never imported by client code; the keys stay in process.env.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import type { z } from "zod";
+import { callGeminiJson, hasGeminiKey } from "./gemini";
+import { extractJson, type AiResult } from "./json";
+
+export { extractJson, type AiResult };
 
 export const MODEL = "claude-haiku-5-5";
 export const TIMEOUT_MS = 8000;
 export const RETRIES = 1;
 
 export const hasApiKey = (): boolean => Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-
-export type AiResult<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 export interface CallOptions<S extends z.ZodType> {
   system: string;
@@ -22,16 +25,6 @@ export interface CallOptions<S extends z.ZodType> {
   retries?: number;
   /** Extra check after zod passes; return a message to reject (counts as a failed attempt). */
   verify?: (data: z.output<S>) => string | null;
-}
-
-/** First balanced-looking JSON object in the text (tolerates ```json fences and stray prose). */
-export function extractJson(text: string): unknown {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
-  const body = (fenced ? fenced[1] : text).trim();
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("no JSON object in response");
-  return JSON.parse(body.slice(start, end + 1));
 }
 
 let cached: { key: string; client: Anthropic } | null = null;
@@ -77,7 +70,11 @@ async function attempt<S extends z.ZodType>(o: CallOptions<S>, timeoutMs: number
 
 /** One call + `retries` more on any failure. Never throws; `reason` explains why the caller should fall back. */
 export async function callClaudeJson<S extends z.ZodType>(o: CallOptions<S>): Promise<AiResult<z.output<S>>> {
-  if (!hasApiKey()) return { ok: false, reason: "no-key" };
+  if (!hasApiKey()) {
+    // Fast budget: these routes sit behind a 20 s client timeout.
+    if (hasGeminiKey()) return callGeminiJson(o.system, o.user, o.schema, { grounded: false, timeoutMs: 11_000, liteTimeoutMs: 7_000, verify: o.verify });
+    return { ok: false, reason: "no-key" };
+  }
   let last: AiResult<z.output<S>> = { ok: false, reason: "unknown" };
   for (let i = 0; i <= (o.retries ?? RETRIES); i++) {
     last = await attempt(o, o.timeoutMs ?? TIMEOUT_MS);

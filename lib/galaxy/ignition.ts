@@ -3,7 +3,7 @@
  * one point → big-bang burst → spiral dust forms → nodes ignite in prerequisite order with pulses along edges →
  * camera settles on the full galaxy.
  */
-import { CONCEPT_BY_ID, CONCEPTS } from "@/lib/data/concepts";
+import { PHYSICS_GRAPH, type GalaxyGraph } from "./graph";
 
 export const IGNITION = {
   duration: 4.2,
@@ -20,28 +20,31 @@ export const IGNITION = {
 } as const;
 
 /** Longest prerequisite chain (across chapters). */
-function depth(id: string, memo: Record<string, number>): number {
+function depth(g: GalaxyGraph, id: string, memo: Record<string, number>): number {
   if (id in memo) return memo[id];
-  const pre = CONCEPT_BY_ID[id].prereqs;
-  memo[id] = pre.length ? 1 + Math.max(...pre.map((p) => depth(p, memo))) : 0;
+  memo[id] = 0; // guards against a cycle
+  const pre = (g.byId[id]?.prereqs ?? []).filter((p) => g.byId[p]);
+  memo[id] = pre.length ? 1 + Math.max(...pre.map((p) => depth(g, p, memo))) : 0;
   return memo[id];
 }
 
-let cachedOrder: Record<string, number> | null = null;
+const orders = new Map<string, Record<string, number>>();
 
 /** Topological ignition order: by prerequisite depth, then syllabus order. */
-export function igniteOrder(): Record<string, number> {
-  if (cachedOrder) return cachedOrder;
+export function igniteOrder(g: GalaxyGraph = PHYSICS_GRAPH): Record<string, number> {
+  const hit = orders.get(g.key);
+  if (hit) return hit;
   const memo: Record<string, number> = {};
-  const sorted = CONCEPTS.map((c, i) => ({ id: c.id, d: depth(c.id, memo), i })).sort((a, b) => a.d - b.d || a.i - b.i);
-  cachedOrder = Object.fromEntries(sorted.map((x, k) => [x.id, k]));
-  return cachedOrder;
+  const sorted = g.concepts.map((c, i) => ({ id: c.id, d: depth(g, c.id, memo), i })).sort((a, b) => a.d - b.d || a.i - b.i);
+  const order = Object.fromEntries(sorted.map((x, k) => [x.id, k]));
+  orders.set(g.key, order);
+  return order;
 }
 
 /** Seconds after ignition start at which a concept's node lights up. */
-export function igniteAt(id: string): number {
-  const k = igniteOrder()[id] ?? 0;
-  return IGNITION.nodesStart + (k / Math.max(1, CONCEPTS.length - 1)) * (IGNITION.nodesEnd - IGNITION.nodesStart);
+export function igniteAt(id: string, g: GalaxyGraph = PHYSICS_GRAPH): number {
+  const k = igniteOrder(g)[id] ?? 0;
+  return IGNITION.nodesStart + (k / Math.max(1, g.concepts.length - 1)) * (IGNITION.nodesEnd - IGNITION.nodesStart);
 }
 
 export const smoothstep = (a: number, b: number, x: number): number => {

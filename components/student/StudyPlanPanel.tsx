@@ -18,7 +18,7 @@ interface Props {
 }
 
 /** Segmented 45-minute bar: one slice per topic, filled as videos are ticked off. */
-function TimeBar({ plan }: { plan: StudyPlan }) {
+export function TimeBar({ plan }: { plan: StudyPlan }) {
   return (
     <div className="flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
       {plan.topics.map((t) => {

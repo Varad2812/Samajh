@@ -3,7 +3,7 @@
  * grounding so suggested videos are real; then plain JSON mode on the main model, then on a fast lite model.
  */
 import type { z } from "zod";
-import { extractJson, type AiResult } from "./client";
+import { extractJson, type AiResult } from "./json";
 
 export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 // Gemini 3 models think before answering; grounded search adds more. Both regularly exceed the 8 s Claude budget.
@@ -22,15 +22,27 @@ interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 }
 
-interface AttemptOptions {
+type Verify<S extends z.ZodType> = (data: z.output<S>) => string | null;
+
+interface AttemptOptions<S extends z.ZodType> {
   model: string;
   grounded: boolean;
   timeoutMs: number;
   /** Lower thinking for Gemini 3 models (the lite alias may not accept it). */
   lowThinking: boolean;
+  verify?: Verify<S>;
 }
 
-async function attempt<S extends z.ZodType>(system: string, user: string, schema: S, o: AttemptOptions): Promise<AiResult<z.output<S>>> {
+export interface GeminiOptions<S extends z.ZodType> {
+  /** Try a Google Search grounded call first (needs grounding quota). Default true. */
+  grounded?: boolean;
+  timeoutMs?: number;
+  liteTimeoutMs?: number;
+  /** Extra check after zod passes; return a message to reject. */
+  verify?: Verify<S>;
+}
+
+async function attempt<S extends z.ZodType>(system: string, user: string, schema: S, o: AttemptOptions<S>): Promise<AiResult<z.output<S>>> {
   const { grounded } = o;
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) return { ok: false, reason: "no-key" };
@@ -63,26 +75,29 @@ async function attempt<S extends z.ZodType>(system: string, user: string, schema
       return { ok: false, reason: "invalid-json" };
     }
     const parsed = schema.safeParse(data);
-    return parsed.success ? { ok: true, data: parsed.data } : { ok: false, reason: "schema-mismatch" };
+    if (!parsed.success) return { ok: false, reason: "schema-mismatch" };
+    const rejected = o.verify?.(parsed.data);
+    return rejected ? { ok: false, reason: rejected } : { ok: true, data: parsed.data };
   } catch (err) {
     return { ok: false, reason: err instanceof Error && err.name === "TimeoutError" ? "timeout" : "unreachable" };
   }
 }
 
 /** Grounded call, then plain JSON mode, then the lite model. Never throws; `reason` lists every failure. */
-export async function callGeminiJson<S extends z.ZodType>(system: string, user: string, schema: S): Promise<AiResult<z.output<S>>> {
+export async function callGeminiJson<S extends z.ZodType>(system: string, user: string, schema: S, opts: GeminiOptions<S> = {}): Promise<AiResult<z.output<S>>> {
   if (!hasGeminiKey()) return { ok: false, reason: "no-key" };
+  const { grounded = true, timeoutMs = PLAIN_TIMEOUT_MS, liteTimeoutMs = LITE_TIMEOUT_MS, verify } = opts;
   const failures: string[] = [];
-  if (Date.now() >= groundingBlockedUntil) {
-    const r = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: true, timeoutMs: GROUNDED_TIMEOUT_MS, lowThinking: true });
+  if (grounded && Date.now() >= groundingBlockedUntil) {
+    const r = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: true, timeoutMs: GROUNDED_TIMEOUT_MS, lowThinking: true, verify });
     if (r.ok) return r;
     if (r.reason === "api-error:429") groundingBlockedUntil = Date.now() + GROUNDING_COOLDOWN_MS;
     failures.push(`grounded:${r.reason}`);
   }
-  const plain = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: false, timeoutMs: PLAIN_TIMEOUT_MS, lowThinking: true });
+  const plain = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: false, timeoutMs, lowThinking: true, verify });
   if (plain.ok) return plain;
   failures.push(`plain:${plain.reason}`);
-  const lite = await attempt(system, user, schema, { model: LITE_MODEL, grounded: false, timeoutMs: LITE_TIMEOUT_MS, lowThinking: false });
+  const lite = await attempt(system, user, schema, { model: LITE_MODEL, grounded: false, timeoutMs: liteTimeoutMs, lowThinking: false, verify });
   if (lite.ok) return lite;
   failures.push(`lite:${lite.reason}`);
   return { ok: false, reason: failures.join(",") };

@@ -32,14 +32,17 @@ interface Props {
   onOpenStudent: (id: string) => void;
   /** Highlight a concept column (e.g. from the weakest-concepts list). */
   highlightConcept?: string | null;
+  /** Real (signed-up) students, polled live: their rows get a live marker. */
+  liveIds?: ReadonlySet<string>;
 }
 
 /** One student row: memoised so hovering (tooltip state) never re-renders 1,000 cells. */
 const Row = memo(function Row({
-  student, dim, activeMc, onOpen, onHover,
+  student, dim, activeMc, onOpen, onHover, live = false,
 }: {
   student: StudentRecord;
   dim: boolean;
+  live?: boolean;
   activeMc: string | null;
   onOpen: (id: string) => void;
   onHover: (h: Hover | null, e?: React.PointerEvent) => void;
@@ -53,8 +56,15 @@ const Row = memo(function Row({
           onClick={() => onOpen(student.id)}
           className="flex h-5 w-[124px] items-center gap-1.5 truncate rounded px-1 text-left text-xs transition-colors group-hover/row:bg-surface-2 hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
         >
-          <span className="size-1.5 shrink-0 rounded-full" style={{ background: masteryColor(mean) }} />
-          <span className="truncate">{student.name}</span>
+          {live ? (
+            <span className="relative flex size-1.5 shrink-0" title="Real student · updates live">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-proficient opacity-60" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-proficient" />
+            </span>
+          ) : (
+            <span className="size-1.5 shrink-0 rounded-full" style={{ background: masteryColor(mean) }} />
+          )}
+          <span className={cn("truncate", live && "font-medium text-foreground")}>{student.name}</span>
         </button>
       </th>
       {CHAPTERS.flatMap((ch) =>
@@ -70,7 +80,7 @@ const Row = memo(function Row({
               className={cn("h-5 min-w-[18px] cursor-pointer p-0", i === 0 && "border-l-2 border-bg")}
             >
               <span
-                className={cn("block size-full rounded-[3px]", activeMc && MISCONCEPTION_BY_ID[activeMc]?.conceptId === c.id && "ring-1 ring-misconception ring-inset")}
+                className={cn("block size-full rounded-[3px] transition-[background-color,opacity] duration-700", activeMc && MISCONCEPTION_BY_ID[activeMc]?.conceptId === c.id && "ring-1 ring-misconception ring-inset")}
                 style={{ background: masteryColor(m.estimated ? null : m.p), opacity: m.estimated ? 0.5 : 0.35 + 0.65 * Math.min(1, m.p + 0.3) }}
               />
             </td>
@@ -91,7 +101,7 @@ const Row = memo(function Row({
 });
 
 /** students × 34 concepts, grouped by chapter. Hover = tooltip, header click = sort by that concept. */
-export function MasteryHeatmap({ roster, at, mcFilter, onMcFilter, onOpenStudent, highlightConcept = null }: Props) {
+export function MasteryHeatmap({ roster, at, mcFilter, onMcFilter, onOpenStudent, highlightConcept = null, liveIds }: Props) {
   const [sort, setSort] = useState<SortKey>("mean");
   const [hover, setHover] = useState<Hover | null>(null);
   const matching = useMemo(() => new Set(filterByMisconception(roster, mcFilter).map((s) => s.id)), [roster, mcFilter]);
@@ -178,7 +188,7 @@ export function MasteryHeatmap({ roster, at, mcFilter, onMcFilter, onOpenStudent
           </thead>
           <tbody>
             {rows.map((s) => (
-              <Row key={s.id} student={s} dim={mcFilter !== null && !matching.has(s.id)} activeMc={mcFilter} onOpen={onOpenStudent} onHover={onHover} />
+              <Row key={s.id} student={s} live={liveIds?.has(s.id) ?? false} dim={mcFilter !== null && !matching.has(s.id)} activeMc={mcFilter} onOpen={onOpenStudent} onHover={onHover} />
             ))}
           </tbody>
         </table>
