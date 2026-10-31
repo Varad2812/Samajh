@@ -1,26 +1,163 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ── Design tokens (DESIGN.md §1). Dark theme only. ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #07080d;
+  --surface: #0e1018;
+  --surface-2: #151826;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e7e9f0;
+  --muted: #8a90a6;
+  --accent: #4fd1ff;
+  --accent-2: #7c5cff;
+  --weak: #ff4d6d;
+  --developing: #ffb547;
+  --proficient: #9be15d;
+  --mastered: #2ee6a6;
+  --unknown: #3a3f55;
+  --misconception: #a78bfa;
+
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* shadcn semantic aliases, mapped onto the tokens above */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface-2);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--bg);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--bg);
+  --destructive: var(--weak);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: var(--accent);
+  --radius: 8px;
+  --chart-1: var(--accent);
+  --chart-2: var(--accent-2);
+  --chart-3: var(--developing);
+  --chart-4: var(--proficient);
+  --chart-5: var(--misconception);
 }
 
 @theme inline {
+  /* Token utilities: bg-surface, text-weak, border-border, … */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-weak: var(--weak);
+  --color-developing: var(--developing);
+  --color-proficient: var(--proficient);
+  --color-mastered: var(--mastered);
+  --color-unknown: var(--unknown);
+  --color-misconception: var(--misconception);
+
+  /* shadcn utilities. `bg-muted` is a surface (shadcn meaning); muted *text* is text-muted-foreground. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Type: Space Grotesk (display), Inter (UI), JetBrains Mono (numbers, IDs, transcripts) */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+  --font-heading: var(--font-display);
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Scale: 12 / 13 / 14 (body) / 16 / 20 / 28 / 44 */
+  --text-xs: 12px;
+  --text-label: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-xl: 20px;
+  --text-title: 28px;
+  --text-hero: 44px;
+
+  /* Radius: 12px panels, 8px inputs/buttons, 999px chips */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-panel: 12px;
+  --radius-2xl: 16px;
+  --radius-chip: 999px;
+
+  --shadow-highlight: var(--highlight);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 14px;
+    /* faint 32px grid on --bg */
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--highlight);
+  }
+  .label-caps {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

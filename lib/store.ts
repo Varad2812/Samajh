@@ -1,0 +1,153 @@
+"use client";
+
+import { useMemo, useSyncExternalStore } from "react";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { addDays, now as virtualNow, startOfDay } from "@/lib/clock";
+import { CONCEPTS } from "@/lib/data/concepts";
+import { DEMO_STUDENT_ID, generateClass, generateDemoStudent } from "@/lib/data/students";
+import type { Attempt, ConceptMastery, ReviewItem, StudentRecord } from "@/lib/types";
+
+export const DEFAULT_P_INIT = 0.3;
+export const DEFAULT_THETA = 1100;
+
+export type Role = "student" | "teacher";
+
+interface StudentSlice {
+  id: string;
+  name: string;
+  theta: number;
+  misconceptions: string[];
+  diagnosticDone: boolean;
+}
+
+interface SettingsSlice {
+  role: Role;
+  /** Virtual clock offset, in days. */
+  offsetDays: number;
+  /** True once an AI call has fallen back to the offline analyzer. */
+  offline: boolean;
+}
+
+interface SamajhState {
+  student: StudentSlice;
+  attempts: Attempt[];
+  mastery: Record<string, ConceptMastery>;
+  schedule: Record<string, ReviewItem>;
+  settings: SettingsSlice;
+
+  recordAttempt: (attempt: Attempt) => void;
+  setMastery: (conceptId: string, value: ConceptMastery) => void;
+  setReview: (conceptId: string, item: ReviewItem) => void;
+  setTheta: (theta: number) => void;
+  setStudentMisconceptions: (ids: string[]) => void;
+  completeDiagnostic: () => void;
+  fastForward: (days?: number) => void;
+  setRole: (role: Role) => void;
+  setOffline: (offline: boolean) => void;
+  loadDemoProfile: () => void;
+  resetDemo: () => void;
+}
+
+const freshMastery = (): Record<string, ConceptMastery> =>
+  Object.fromEntries(
+    CONCEPTS.map((c) => [c.id, { p: DEFAULT_P_INIT, estimated: true, suspect: false, history: [] }]),
+  );
+
+const initialData = () => ({
+  student: { id: DEMO_STUDENT_ID, name: "Aarav", theta: DEFAULT_THETA, misconceptions: [], diagnosticDone: false },
+  attempts: [] as Attempt[],
+  mastery: freshMastery(),
+  schedule: {} as Record<string, ReviewItem>,
+  settings: { role: "student" as Role, offsetDays: 0, offline: false },
+});
+
+export const useStore = create<SamajhState>()(
+  persist(
+    (set) => ({
+      ...initialData(),
+
+      recordAttempt: (attempt) => set((s) => ({ attempts: [...s.attempts, attempt] })),
+      setMastery: (conceptId, value) => set((s) => ({ mastery: { ...s.mastery, [conceptId]: value } })),
+      setReview: (conceptId, item) => set((s) => ({ schedule: { ...s.schedule, [conceptId]: item } })),
+      setTheta: (theta) => set((s) => ({ student: { ...s.student, theta } })),
+      setStudentMisconceptions: (ids) => set((s) => ({ student: { ...s.student, misconceptions: ids } })),
+      completeDiagnostic: () => set((s) => ({ student: { ...s.student, diagnosticDone: true } })),
+      fastForward: (days = 3) => set((s) => ({ settings: { ...s.settings, offsetDays: s.settings.offsetDays + days } })),
+      setRole: (role) => set((s) => ({ settings: { ...s.settings, role } })),
+      setOffline: (offline) => set((s) => ({ settings: { ...s.settings, offline } })),
+
+      loadDemoProfile: () =>
+        set((s) => {
+          const demo = generateDemoStudent(virtualNow(s.settings.offsetDays));
+          return {
+            student: { id: demo.id, name: demo.name, theta: demo.theta, misconceptions: demo.misconceptions, diagnosticDone: true },
+            attempts: demo.attempts,
+            mastery: demo.mastery,
+            schedule: demo.schedule,
+          };
+        }),
+      resetDemo: () => set(initialData()),
+    }),
+    {
+      name: "samajh-v1",
+      storage: createJSONStorage(() => localStorage),
+      // Rehydrated explicitly on the client (StoreHydrator) to avoid SSR mismatches.
+      skipHydration: true,
+      partialize: (s) => ({
+        student: s.student,
+        attempts: s.attempts,
+        mastery: s.mastery,
+        schedule: s.schedule,
+        settings: s.settings,
+      }),
+    },
+  ),
+);
+
+const serverNull = () => null;
+
+/** True after the persisted store has been rehydrated on the client (always false during SSR). */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useStore.persist.onFinishHydration(cb),
+    () => useStore.persist.hasHydrated(),
+    () => false,
+  );
+}
+
+const MINUTE_MS = 60_000;
+const subscribeMinute = (cb: () => void) => {
+  const id = setInterval(cb, MINUTE_MS);
+  return () => clearInterval(id);
+};
+/** Real time floored to the minute: a stable snapshot between ticks. */
+const getMinute = () => Math.floor(Date.now() / MINUTE_MS) * MINUTE_MS;
+
+/** Real "now" floored to the minute; null on the server and before hydration. */
+function useRealMinute(): number | null {
+  const minute = useSyncExternalStore(subscribeMinute, getMinute, serverNull);
+  return useHydrated() ? minute : null;
+}
+
+/** Virtual "now" in ms (null until hydrated). Updates on fast-forward and once a minute. */
+export function useVirtualNow(): number | null {
+  const offsetDays = useStore((s) => s.settings.offsetDays);
+  const real = useRealMinute();
+  return real === null ? null : addDays(real, offsetDays);
+}
+
+/** The synthetic class (seeded), anchored to the real today so fast-forward makes reviews overdue. */
+export function useClassRoster(): StudentRecord[] | null {
+  const real = useRealMinute();
+  const day = real === null ? null : startOfDay(real);
+  return useMemo(() => (day === null ? null : generateClass(day)), [day]);
+}
+
+/** Concepts whose SM-2 review is due at the virtual time. */
+export function dueConceptIds(schedule: Record<string, ReviewItem>, at: number): string[] {
+  return Object.entries(schedule)
+    .filter(([, item]) => item.due <= at)
+    .sort(([, a], [, b]) => a.due - b.due)
+    .map(([id]) => id);
+}

@@ -1,69 +1,83 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, AudioLines, GraduationCap, Orbit, School, Tag } from "lucide-react";
+import { CHAPTERS, CONCEPTS } from "@/lib/data/concepts";
+import { MISCONCEPTIONS } from "@/lib/data/misconceptions";
+import { QUESTIONS } from "@/lib/data/questions";
+import { TEACHER_NAME } from "@/lib/data/students";
 
-export default function Home() {
+const STEPS = [
+  { icon: AudioLines, title: "Speak your reasoning", example: "“umm so the first bulb uses up some current… wait no”", tone: "text-developing" },
+  { icon: Tag, title: "We find the misconception", example: "MC01 · Current used up", tone: "text-misconception" },
+  { icon: Orbit, title: "Your galaxy adapts", example: "C1 Charge & current .34 → .51", tone: "text-mastered" },
+];
+
+export default function Landing() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="mx-auto flex max-w-6xl flex-col gap-10 py-6 lg:py-12">
+      <section className="flex flex-col gap-4">
+        <span className="label-caps">CBSE Class 10 Physics · {CONCEPTS.length} concepts · {QUESTIONS.length} questions</span>
+        <h1 className="max-w-3xl text-[32px] leading-tight font-semibold tracking-tight sm:text-[44px]">
+          The tutor that listens to <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">how you think.</span>
+        </h1>
+        <p className="max-w-2xl text-base text-muted-foreground">
+          Tap an answer, then say <em>why</em> out loud. Samajh cleans your speech, reads hesitation as confidence, and spots the
+          misconception even when your final answer is right.
+        </p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <Link href="/student" className="panel group flex flex-col gap-4 p-4 transition-colors hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="size-5 text-accent" aria-hidden />
+            <span className="font-display text-xl font-semibold">Student · Aarav</span>
+            <ArrowRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {CHAPTERS.map((ch) => (
+              <div key={ch.id} className="rounded-lg bg-surface-2 p-2">
+                <div className="text-xs text-muted-foreground">{ch.short}</div>
+                <div className="font-mono text-sm tabular">{CONCEPTS.filter((c) => c.chapter === ch.id).length} nodes</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">12-question adaptive diagnostic, then practice targeted at your weakest prerequisites.</p>
+        </Link>
+        <Link href="/teacher" className="panel group flex flex-col gap-4 p-4 transition-colors hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none">
+          <div className="flex items-center gap-2">
+            <School className="size-5 text-accent-2" aria-hidden />
+            <span className="font-display text-xl font-semibold">Teacher · {TEACHER_NAME}</span>
+            <ArrowRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Students" value="31" />
+            <Stat label="Misconceptions tracked" value={String(MISCONCEPTIONS.length)} />
+            <Stat label="Heatmap cells" value={String(31 * CONCEPTS.length)} />
+          </div>
+          <p className="text-xs text-muted-foreground">Class X-ray: who is stuck, on which concept, and the shared wrong belief behind it.</p>
+        </Link>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        {STEPS.map(({ icon: Icon, title, example, tone }, i) => (
+          <div key={title} className="panel flex flex-col gap-2 p-4">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-muted-foreground tabular">0{i + 1}</span>
+              <Icon className={`size-4 ${tone}`} aria-hidden />
+              <span className="font-medium">{title}</span>
+            </div>
+            <p className="rounded-lg bg-surface-2 px-3 py-2 font-mono text-xs text-muted-foreground">{example}</p>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2 p-2">
+      <div className="truncate text-xs text-muted-foreground">{label}</div>
+      <div className="font-mono text-sm tabular">{value}</div>
     </div>
   );
 }
