@@ -8,6 +8,7 @@ import { CONCEPTS } from "@/lib/data/concepts";
 import { BKT_DEFAULTS } from "@/lib/engine/bkt";
 import { INITIAL_THETA } from "@/lib/engine/elo";
 import { DEMO_STUDENT_ID, generateClass, generateDemoStudent } from "@/lib/data/students";
+import { appendFx, misconceptionFx, shockwaveFor, type FxEvent, type FxInput } from "@/lib/fx";
 import type { Attempt, ConceptMastery, ReviewItem, StudentRecord } from "@/lib/types";
 
 export const DEFAULT_P_INIT = BKT_DEFAULTS.pInit;
@@ -37,7 +38,11 @@ interface SamajhState {
   mastery: Record<string, ConceptMastery>;
   schedule: Record<string, ReviewItem>;
   settings: SettingsSlice;
+  /** Transient 3D effect events (not persisted). */
+  fx: FxEvent[];
+  fxSeq: number;
 
+  triggerFx: (...events: FxInput[]) => void;
   recordAttempt: (attempt: Attempt) => void;
   setMastery: (conceptId: string, value: ConceptMastery) => void;
   setReview: (conceptId: string, item: ReviewItem) => void;
@@ -68,13 +73,25 @@ export const useStore = create<SamajhState>()(
   persist(
     (set) => ({
       ...initialData(),
+      fx: [],
+      fxSeq: 1,
 
+      triggerFx: (...events) => set((s) => appendFx(s.fx, events, s.fxSeq, Date.now())),
       recordAttempt: (attempt) => set((s) => ({ attempts: [...s.attempts, attempt] })),
-      setMastery: (conceptId, value) => set((s) => ({ mastery: { ...s.mastery, [conceptId]: value } })),
+      setMastery: (conceptId, value) =>
+        set((s) => {
+          const wave = shockwaveFor(conceptId, s.mastery[conceptId]?.p ?? value.p, value.p);
+          return { mastery: { ...s.mastery, [conceptId]: value }, ...(wave ? appendFx(s.fx, [wave], s.fxSeq, Date.now()) : {}) };
+        }),
       setReview: (conceptId, item) => set((s) => ({ schedule: { ...s.schedule, [conceptId]: item } })),
       setTheta: (theta) => set((s) => ({ student: { ...s.student, theta } })),
-      setStudentMisconceptions: (ids) => set((s) => ({ student: { ...s.student, misconceptions: ids } })),
-      completeDiagnostic: () => set((s) => ({ student: { ...s.student, diagnosticDone: true } })),
+      setStudentMisconceptions: (ids) =>
+        set((s) => ({
+          student: { ...s.student, misconceptions: ids },
+          ...appendFx(s.fx, misconceptionFx(s.student.misconceptions, ids), s.fxSeq, Date.now()),
+        })),
+      completeDiagnostic: () =>
+        set((s) => ({ student: { ...s.student, diagnosticDone: true }, ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()) })),
       fastForward: (days = 3) => set((s) => ({ settings: { ...s.settings, offsetDays: s.settings.offsetDays + days } })),
       setRole: (role) => set((s) => ({ settings: { ...s.settings, role } })),
       setOffline: (offline) => set((s) => ({ settings: { ...s.settings, offline } })),
@@ -87,6 +104,8 @@ export const useStore = create<SamajhState>()(
             attempts: demo.attempts,
             mastery: demo.mastery,
             schedule: demo.schedule,
+            // The whole galaxy changes at once: reveal it with Ignition rather than 34 shockwaves.
+            ...appendFx(s.fx, [{ kind: "ignition" }], s.fxSeq, Date.now()),
           };
         }),
       resetDemo: () => set(initialData()),
@@ -106,6 +125,14 @@ export const useStore = create<SamajhState>()(
     },
   ),
 );
+
+/** Explicit triggers for the signature 3D moments (they also fire automatically from state changes). */
+export const fx = {
+  ignite: () => useStore.getState().triggerFx({ kind: "ignition" }),
+  strike: (conceptId: string, misconceptionId: string) => useStore.getState().triggerFx({ kind: "strike", conceptId, misconceptionId }),
+  shatter: (conceptId: string, misconceptionId: string) => useStore.getState().triggerFx({ kind: "shatter", conceptId, misconceptionId }),
+  shockwave: (conceptId: string, from: number, to: number) => useStore.getState().triggerFx({ kind: "shockwave", conceptId, from, to }),
+};
 
 const serverNull = () => null;
 

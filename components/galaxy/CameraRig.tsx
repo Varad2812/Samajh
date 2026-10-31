@@ -4,11 +4,16 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree, type RootState } from "@react-three/fiber";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { useSignals } from "@/components/fx/SceneSignals";
+import { IGNITION, smoothstep } from "@/lib/galaxy/ignition";
 import { galaxyLayout } from "@/lib/galaxy/layout";
 
 export const HOME_POSITION = new THREE.Vector3(0, 13, 22);
 export const HOME_TARGET = new THREE.Vector3(0, 0, 0);
+export const BASE_FOV = 45;
+const IGNITION_FROM = new THREE.Vector3(0, 1.6, 5);
 const FLY_DURATION = 0.8;
+const FOV_PUNCH = 5;
 const FOCUS_DISTANCE = 7;
 const IDLE_BEFORE_ROTATE = 3;
 /** While the side sheet is open, shift the projection so the focused node sits left of it. */
@@ -25,15 +30,20 @@ interface Flight {
 const easeInOutCubic = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 const controlsOf = (s: RootState) => s.controls as unknown as OrbitControlsImpl | null;
 
-/** Fly-to on selection (≈800ms, controls disabled), fly home on reset, auto-rotate when idle. */
+/**
+ * Fly-to on selection (≈800ms eased, FOV punch, orbit disabled), fly home on reset, auto-rotate when idle,
+ * and the Ignition pull-back from the core to the full galaxy.
+ */
 export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selectedId: string | null; resetKey?: number; reducedMotion: boolean }) {
   const get = useThree((s) => s.get);
   const hasControls = useThree((s) => s.controls !== null);
+  const signals = useSignals();
   const flight = useRef<Flight | null>(null);
   const interacting = useRef(false);
   const lastInteraction = useRef(0);
   const now = useRef(0);
   const viewShift = useRef(0);
+  const wasIgniting = useRef(false);
 
   const flyTo = (toPos: THREE.Vector3, toTarget: THREE.Vector3) => {
     const state = get();
@@ -94,17 +104,46 @@ export function CameraRig({ selectedId, resetKey = 0, reducedMotion }: { selecte
 
     const controls = controlsOf(state);
     if (!controls) return;
+
+    // Ignition: pull back from the core to the overview; orbit locked.
+    const el = signals.ignitionElapsed(now.current);
+    if (el !== Infinity) {
+      flight.current = null;
+      wasIgniting.current = true;
+      const k = smoothstep(0.5, IGNITION.duration - 0.2, el);
+      camera.position.lerpVectors(IGNITION_FROM, HOME_POSITION, k);
+      controls.target.copy(HOME_TARGET);
+      controls.enabled = false;
+      controls.autoRotate = false;
+      signals.setFly(0);
+      return;
+    }
+    if (wasIgniting.current) {
+      // Ended (or skipped): settle smoothly on the overview.
+      wasIgniting.current = false;
+      lastInteraction.current = now.current;
+      flyTo(HOME_POSITION.clone(), HOME_TARGET.clone());
+    }
+
     const f = flight.current;
+    let punch = 0;
     if (f) {
       if (f.t0 === null) f.t0 = now.current;
       const k = Math.min(1, (now.current - f.t0) / FLY_DURATION);
       const e = easeInOutCubic(k);
-      state.camera.position.lerpVectors(f.fromPos, f.toPos, e);
+      camera.position.lerpVectors(f.fromPos, f.toPos, e);
       controls.target.lerpVectors(f.fromTarget, f.toTarget, e);
+      punch = Math.sin(k * Math.PI);
       if (k >= 1) {
         flight.current = null;
         lastInteraction.current = now.current;
       }
+    }
+    signals.setFly(punch);
+    const fov = BASE_FOV + FOV_PUNCH * punch;
+    if (Math.abs(camera.fov - fov) > 0.01) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
     }
     // Orbit input is disabled while flying.
     controls.enabled = !flight.current;

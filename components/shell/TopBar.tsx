@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, GraduationCap, RotateCcw, School, Sparkles } from "lucide-react";
+import { ChevronDown, GraduationCap, Orbit, RotateCcw, School, Sparkles } from "lucide-react";
 import { TEACHER_NAME } from "@/lib/data/students";
-import { useStore, type Role } from "@/lib/store";
+import { fx, useStore, type Role } from "@/lib/store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +66,15 @@ export function TopBar() {
           <DropdownMenuItem onClick={loadDemoProfile}>
             <Sparkles /> Load demo profile
             <span className="ml-auto font-mono text-xs text-muted-foreground">⇧D</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              if (window.location.pathname !== "/student") router.push("/student");
+              // Let the galaxy mount before the event fires.
+              window.setTimeout(fx.ignite, 400);
+            }}
+          >
+            <Orbit /> Replay galaxy ignition
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

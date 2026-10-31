@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { PerformanceMonitor } from "@react-three/drei";
+import { QualityContext, SceneSignals, SignalsContext } from "@/components/fx/SceneSignals";
 import { galaxyLayout, oneHop } from "@/lib/galaxy/layout";
 import { GalaxyScene } from "./GalaxyScene";
+import { usePerformanceFallback } from "./usePerformanceFallback";
 import type { MiniGalaxyProps } from "./types";
 import { useReducedMotion } from "./useReducedMotion";
 
@@ -45,7 +48,11 @@ export default function MiniGalaxyCanvas({ nodes, focusId, onSelect }: MiniGalax
   const focusSet = useMemo(() => new Set([focusId]), [focusId]);
 
   // Render continuously after a change or while hovered; otherwise on demand (static frame).
-  const changeKey = focusId + "|" + [...hop].map((id) => `${nodes[id].p.toFixed(3)}${nodes[id].due ? "d" : ""}`).join(",");
+  // Effects (shockwave, strike, shatter) always coincide with one of these changing, which wakes the render loop.
+  const changeKey =
+    focusId + "|" + [...hop].map((id) => `${nodes[id].p.toFixed(3)}${nodes[id].due ? "d" : ""}m${nodes[id].misconceptions}`).join(",");
+  const [signals] = useState(() => new SceneSignals());
+  const perf = usePerformanceFallback();
   const [idleKey, setIdleKey] = useState<string | null>(null);
   const [hovered, setHovered] = useState(false);
   useEffect(() => {
@@ -57,23 +64,29 @@ export default function MiniGalaxyCanvas({ nodes, focusId, onSelect }: MiniGalax
   return (
     <Canvas
       frameloop={idle ? "demand" : "always"}
-      dpr={[1, 2]}
+      dpr={perf.quality.low ? 1 : [1, 2]}
       camera={{ fov: 42, near: 0.1, far: 120 }}
       gl={{ antialias: false, powerPreference: "high-performance" }}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
       aria-label={`Mini galaxy focused on ${focusId} and its neighbours`}
+      data-quality={perf.quality.low ? "low" : "high"}
     >
-      <GalaxyScene
-        nodes={nodes}
-        selectedId={focusId}
-        visibleIds={hop}
-        activeIds={focusSet}
-        reducedMotion={reducedMotion}
-        compact
-        onSelect={onSelect}
-      />
-      <MiniRig focusId={focusId} reducedMotion={reducedMotion} />
+      <SignalsContext.Provider value={signals}>
+        <QualityContext.Provider value={perf.quality}>
+          {!idle && <PerformanceMonitor bounds={perf.bounds} flipflops={3} onDecline={perf.onDecline} onIncline={perf.onIncline} onFallback={perf.onFallback} />}
+          <GalaxyScene
+            nodes={nodes}
+            selectedId={focusId}
+            visibleIds={hop}
+            activeIds={focusSet}
+            reducedMotion={reducedMotion}
+            compact
+            onSelect={onSelect}
+          />
+          <MiniRig focusId={focusId} reducedMotion={reducedMotion} />
+        </QualityContext.Provider>
+      </SignalsContext.Provider>
     </Canvas>
   );
 }

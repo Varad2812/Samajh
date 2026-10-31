@@ -236,3 +236,27 @@ Format:
   - three is pinned to `~0.186` because postprocessing 6.39 requires three < 0.187.
 - Verified: real Edge on the Intel UHD iGPU (D3D11) at 1440×900. 144 fps in every state (display cap) with p95 frame 7.1ms; worst single frame 21ms during fly-to. Clicking a node at the screen centre opens its sheet, search fly-to and chip navigation work, 390px has no horizontal overflow, and there are no console errors. 6 new layout tests (83 total).
 - Known issues / next: `THREE.Clock` deprecation warning comes from inside R3F (harmless). The practice page below the question is still sparse until phase 5 adds reasoning input + analysis. Streak reads 0d for the demo profile because its seeded attempts aren't on consecutive recent days. Next: phase 3B wow pack.
+
+### Phase 3B — 3D wow pack — 2026-10-31
+- Screens touched: Knowledge Galaxy (`/student`), MiniGalaxy (`/student/practice`), TopBar menu ("Replay galaxy ignition").
+- What changed (UI/UX) — §4.1:
+  - Node shader (`lib/shaders/node.glsl.ts`): fbm "plasma" surface, a soft white-hot core, and a fresnel rim in the mastery colour. Mastered nodes get a pulsing corona sprite; weak nodes flicker on top of the 1.6s pulse.
+  - Chapter nebulae: billboarded additive planes with drifting two-octave fbm wisps, tinted per chapter.
+  - Spiral dust: 7,000 twinkling points (custom points shader with size attenuation) in a warm core plus four logarithmic arms, each passing through its chapter cluster. It sways slowly (±0.12 rad) instead of spinning, so the arms stay under the constellations.
+  - Edges: quadratic béziers lifted upward. A dash shader flows prereq → dependent with brightness = prereq mastery, and a spark travels along each curve. Still one draw call.
+  - Post stack: Bloom (mipmap) → ACES tone mapping → chromatic aberration (0.0004, swelling to ~0.003 during fly-to) → film grain 0.03 → vignette.
+  - Fly-to adds a 5° FOV punch.
+- What changed (UI/UX) — §4.2 moments 1–3, driven by store events (`lib/fx.ts`, `fx` slice):
+  - **Galaxy Ignition** (~4.2s, skippable by click or "Skip intro"): a lone star swells and collapses into a 1,800-particle big bang, the spiral dust swirls out of the core, then nodes ignite one by one in prerequisite order with a flash while light pulses draw each edge from prereq to dependent. Stars and nebulae fade in and the camera pulls back from the core to the overview. Fires on "Load demo profile" and `completeDiagnostic` (the diagnostic reveal), or from the menu.
+  - **Misconception Strike**: a violet comet with a glowing trail curves in and accelerates into the node, then an impact ring and a ring burst; the new orbiting satellite pops in at impact. Clearing a misconception **shatters** the satellite into violet/white sparks. Works in both the full galaxy and the MiniGalaxy.
+  - **Mastery Shockwave**: two expanding rings in the tilted galaxy plane in the new mastery colour, a ~600ms colour lerp, and a brief brightening of the concept and its dependents. Crossing .85 fires a supernova (160-particle sparkle + flash).
+  - Triggering: automatic (`setMastery` → shockwave when Δ ≥ .005; `setStudentMisconceptions` → strike/shatter; demo profile / diagnostic → ignition), or explicit via `fx.ignite()`, `fx.strike(c, mc)`, `fx.shatter(c, mc)`, `fx.shockwave(c, from, to)` from `@/lib/store`. Canvases only play events that arrive while mounted, so nothing replays on navigation.
+  - Reusable pieces: `components/fx/` holds Burst (GPU particles, zero per-frame CPU), MisconceptionStrike, MasteryShockwave, IgnitionDirector, FxLayer, PostStack and SceneSignals.
+- Performance fallback: drei `PerformanceMonitor` (bounds 45 / 0.9×refresh, 3 flip-flops then lock). Low quality halves the dust, drops chromatic aberration and sets DPR to 1; `?lowfx` forces it. `prefers-reduced-motion` skips Ignition and the comet (satellite appears instantly) and freezes plasma, dust and dash flow.
+- Deviations from spec + why:
+  - Dust sways rather than rotating continuously, so the constellations stay on their arms.
+  - Labels stay as drei `<Html>` (DOM) rather than `<Text>`; the §4.1 label item wasn't in this phase's scope.
+  - Node emissive intensities were lowered from phase 3 so mastery hues survive ACES.
+  - `?debug` (or a dev build) exposes `window.__samajh = { store, fx }` for rehearsal and testing.
+- Verified: real Edge on the Intel UHD iGPU, 1440×900, production build. Idle and auto-rotate 144 fps, full Ignition 144 fps, fly-to 143 fps (worst frame 21ms), all five effects fired at once 144 fps (worst 14ms), MiniGalaxy strike 144 fps, forced-low 144 fps. On battery at 60 Hz in phase 3 it was a locked 60. Skip works; no console errors. 13 new tests (96 total).
+- Known issues / next: at overview distance the four dust arms are present but read as a field around a bright core rather than crisp arms. Next: phase 4 AI layer.

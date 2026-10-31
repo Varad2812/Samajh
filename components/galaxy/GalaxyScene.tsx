@@ -1,10 +1,16 @@
 "use client";
 
-import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
-import { CONCEPTS } from "@/lib/data/concepts";
+import { useMemo } from "react";
+import { FxLayer } from "@/components/fx/FxLayer";
+import { PostStack } from "@/components/fx/PostStack";
+import { useFreshFx } from "@/components/fx/useFreshFx";
+import { CONCEPTS, dependentsOf } from "@/lib/data/concepts";
+import { STRIKE_IMPACT_MS } from "@/lib/fx";
 import { galaxyLayout } from "@/lib/galaxy/layout";
 import { TOKENS } from "@/lib/utils";
 import { ConceptNode } from "./ConceptNode";
+import { Dust } from "./Dust";
+import { Nebulae } from "./Nebulae";
 import { PrereqEdges } from "./PrereqEdges";
 import { ClusterLabels, Starfield } from "./Starfield";
 import type { GalaxyNodes } from "./types";
@@ -18,19 +24,35 @@ interface Props {
   activeIds: ReadonlySet<string>;
   reducedMotion: boolean;
   compact?: boolean;
+  /** Hide DOM labels while Ignition plays. */
+  igniting?: boolean;
   onSelect?: (id: string) => void;
 }
 
 /** Scene contents shared by KnowledgeGalaxy and MiniGalaxy. */
-export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedMotion, compact = false, onSelect }: Props) {
+export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedMotion, compact = false, igniting = false, onSelect }: Props) {
   const { positions } = galaxyLayout();
+  const events = useFreshFx();
+
+  // Shockwaves briefly brighten the concept's dependents; strikes reveal the new satellite at impact.
+  const { boostAt, satelliteAt } = useMemo(() => {
+    const boost: Record<string, number> = {};
+    const sat: Record<string, number> = {};
+    for (const e of events) {
+      if (e.kind === "shockwave") {
+        boost[e.conceptId] = e.at;
+        for (const d of dependentsOf(e.conceptId)) boost[d.id] = e.at;
+      } else if (e.kind === "strike") sat[e.conceptId] = e.at + (reducedMotion ? 0 : STRIKE_IMPACT_MS);
+    }
+    return { boostAt: boost, satelliteAt: sat };
+  }, [events, reducedMotion]);
+
   return (
     <>
       <color attach="background" args={[TOKENS.bg]} />
-      <fog attach="fog" args={[TOKENS.bg, compact ? 10 : 28, compact ? 30 : 60]} />
-      <ambientLight intensity={0.2} />
-      <pointLight position={[0, 8, 0]} intensity={30} color={TOKENS.accent2} />
-      <Starfield reducedMotion={reducedMotion} />
+      <Starfield reducedMotion={reducedMotion} count={compact ? 1500 : 3500} />
+      <Dust reducedMotion={reducedMotion} sizeScale={compact ? 0.3 : 1} />
+      <Nebulae reducedMotion={reducedMotion} size={compact ? 9 : 11} />
       <PrereqEdges nodes={nodes} activeIds={activeIds} reducedMotion={reducedMotion} />
       {CONCEPTS.map((c) => (
         <ConceptNode
@@ -41,14 +63,14 @@ export function GalaxyScene({ nodes, selectedId, visibleIds, activeIds, reducedM
           selected={selectedId === c.id}
           dimmed={visibleIds !== null && !visibleIds.has(c.id)}
           reducedMotion={reducedMotion}
+          boostAt={boostAt[c.id]}
+          satelliteAt={satelliteAt[c.id]}
           onSelect={onSelect}
         />
       ))}
-      {!compact && <ClusterLabels />}
-      <EffectComposer multisampling={0}>
-        <Bloom mipmapBlur luminanceThreshold={0.2} intensity={0.9} />
-        <Vignette offset={0.3} darkness={0.75} />
-      </EffectComposer>
+      {!compact && <ClusterLabels hidden={igniting} />}
+      <FxLayer events={events} reducedMotion={reducedMotion} />
+      <PostStack />
     </>
   );
 }

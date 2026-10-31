@@ -17,7 +17,7 @@ export const CHAPTER_COLOR: Record<Chapter, string> = {
   electricity: "#FFB547",
   magnetism: "#FF5C93",
 };
-const CHAPTER_ANGLE: Record<Chapter, number> = {
+export const CHAPTER_ANGLE: Record<Chapter, number> = {
   light: (150 * Math.PI) / 180,
   eye: (60 * Math.PI) / 180,
   electricity: (-30 * Math.PI) / 180,

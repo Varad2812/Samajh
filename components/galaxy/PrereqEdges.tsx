@@ -3,15 +3,15 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useSignals } from "@/components/fx/SceneSignals";
+import { igniteAt } from "@/lib/galaxy/ignition";
 import { galaxyLayout } from "@/lib/galaxy/layout";
+import { EDGE_FRAGMENT, EDGE_VERTEX } from "@/lib/shaders/edge.glsl";
 import { masteryColor, TOKENS } from "@/lib/utils";
 import type { GalaxyNodes } from "./types";
 
-const nodeColor = (nodes: GalaxyNodes, id: string) =>
-  new THREE.Color(nodes[id].estimated ? TOKENS.unknown : masteryColor(nodes[id].p));
-
-const PARTICLES_PER_EDGE = 2;
-const SPEED = 0.22; // edge lengths per second
+const SEGMENTS = 20;
+const SPEED = 0.18; // curve fractions per second for the travelling spark
 
 interface Props {
   nodes: GalaxyNodes;
@@ -20,81 +20,116 @@ interface Props {
   reducedMotion: boolean;
 }
 
-/** Prerequisite → dependent lines (one draw call) plus particles flowing toward the dependent (instanced). */
+/** Quadratic bezier lifted upward (toward the usual camera position). */
+function curveFor(a: THREE.Vector3, b: THREE.Vector3): THREE.QuadraticBezierCurve3 {
+  const mid = a.clone().lerp(b, 0.5);
+  mid.y += Math.min(1.6, 0.22 * a.distanceTo(b));
+  return new THREE.QuadraticBezierCurve3(a, mid, b);
+}
+
+/**
+ * Curved prerequisite edges with an animated dash shader flowing prereq → dependent (one draw call),
+ * brightness = prereq mastery, plus one travelling spark per edge. Ignition draws each edge progressively.
+ */
 export function PrereqEdges({ nodes, activeIds, reducedMotion }: Props) {
   const { positions, edges } = galaxyLayout();
-  const particles = useRef<THREE.InstancedMesh>(null);
+  const signals = useSignals();
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const sparks = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const ends = useMemo(
-    () => edges.map(([a, b]) => [new THREE.Vector3(...positions[a]), new THREE.Vector3(...positions[b])] as const),
-    [edges, positions],
-  );
+  const curves = useMemo(() => edges.map(([a, b]) => curveFor(new THREE.Vector3(...positions[a]), new THREE.Vector3(...positions[b]))), [edges, positions]);
 
-  const { base, active } = useMemo(() => {
-    const colorOf = (id: string) => nodeColor(nodes, id);
-    const build = (list: (readonly [string, string])[], bright: boolean) => {
-      const g = new THREE.BufferGeometry();
-      const pos: number[] = [];
-      const col: number[] = [];
-      for (const [a, b] of list) {
-        pos.push(...positions[a], ...positions[b]);
-        const ca = bright ? new THREE.Color(TOKENS.accent) : colorOf(a);
-        const cb = bright ? colorOf(b) : new THREE.Color(TOKENS.muted);
-        col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b);
+  const geometry = useMemo(() => {
+    const n = edges.length * SEGMENTS * 2;
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const u = new Float32Array(n);
+    const len = new Float32Array(n);
+    const idx = new Float32Array(n);
+    const bright = new Float32Array(n);
+    const active = new Float32Array(n);
+    const ignite = new Float32Array(n * 2);
+    let v = 0;
+    edges.forEach(([a, b], e) => {
+      const pts = curves[e].getPoints(SEGMENTS);
+      const length = curves[e].getLength();
+      const c = new THREE.Color(nodes[a].estimated ? TOKENS.unknown : masteryColor(nodes[a].p));
+      const isActive = activeIds.has(a) || activeIds.has(b) ? 1 : 0;
+      for (let s = 0; s < SEGMENTS; s++) {
+        for (const k of [s, s + 1]) {
+          pos.set([pts[k].x, pts[k].y, pts[k].z], v * 3);
+          col.set([c.r, c.g, c.b], v * 3);
+          u[v] = k / SEGMENTS;
+          len[v] = length;
+          idx[v] = e;
+          bright[v] = nodes[a].estimated ? 0.15 : nodes[a].p;
+          active[v] = isActive;
+          ignite.set([igniteAt(a), igniteAt(b)], v * 2);
+          v++;
+        }
       }
-      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-      return g;
-    };
-    const touching = edges.filter(([a, b]) => activeIds.has(a) || activeIds.has(b));
-    return { base: build(edges, false), active: build(touching, true) };
-  }, [edges, positions, nodes, activeIds]);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+    g.setAttribute("aU", new THREE.BufferAttribute(u, 1));
+    g.setAttribute("aLen", new THREE.BufferAttribute(len, 1));
+    g.setAttribute("aEdge", new THREE.BufferAttribute(idx, 1));
+    g.setAttribute("aBright", new THREE.BufferAttribute(bright, 1));
+    g.setAttribute("aActive", new THREE.BufferAttribute(active, 1));
+    g.setAttribute("aIgnite", new THREE.BufferAttribute(ignite, 2));
+    return g;
+  }, [edges, curves, nodes, activeIds]);
+  useLayoutEffect(() => () => geometry.dispose(), [geometry]);
 
-  useLayoutEffect(() => () => {
-    base.dispose();
-    active.dispose();
-  }, [base, active]);
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uIgnite: { value: 1000 }, uAccent: { value: new THREE.Color(TOKENS.accent) } }), []);
 
-  // Particle colour = prerequisite mastery ("knowledge flows").
+  // Spark colour = prerequisite mastery, brighter on active edges.
   useLayoutEffect(() => {
-    const mesh = particles.current;
+    const mesh = sparks.current;
     if (!mesh) return;
     edges.forEach(([a, b], i) => {
-      const touching = activeIds.has(a) || activeIds.has(b);
-      const c = nodeColor(nodes, a).lerp(new THREE.Color(TOKENS.text), 0.35).multiplyScalar(touching ? 2.2 : 1.2);
-      for (let k = 0; k < PARTICLES_PER_EDGE; k++) mesh.setColorAt(i * PARTICLES_PER_EDGE + k, c);
+      const base = new THREE.Color(nodes[a].estimated ? TOKENS.unknown : masteryColor(nodes[a].p)).lerp(new THREE.Color(TOKENS.text), 0.35);
+      mesh.setColorAt(i, base.multiplyScalar(activeIds.has(a) || activeIds.has(b) ? 2.4 : 1.3));
     });
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [edges, nodes, activeIds]);
 
   useFrame((state) => {
-    const mesh = particles.current;
+    const t = state.clock.elapsedTime;
+    const el = signals.ignitionElapsed(t);
+    if (material.current) {
+      material.current.uniforms.uTime.value = reducedMotion ? 0 : t;
+      material.current.uniforms.uIgnite.value = el === Infinity ? 1000 : el;
+    }
+    const mesh = sparks.current;
     if (!mesh) return;
-    const t = reducedMotion ? 0 : state.clock.elapsedTime;
-    ends.forEach(([a, b], i) => {
-      const len = a.distanceTo(b);
-      for (let k = 0; k < PARTICLES_PER_EDGE; k++) {
-        const u = (((t * SPEED * 6) / Math.max(len, 0.5) + k / PARTICLES_PER_EDGE + i * 0.137) % 1 + 1) % 1;
-        dummy.position.lerpVectors(a, b, u);
-        // Fade in/out at the ends by shrinking.
-        const s = Math.sin(u * Math.PI);
-        dummy.scale.setScalar(0.4 + 0.6 * s);
-        dummy.updateMatrix();
-        mesh.setMatrixAt(i * PARTICLES_PER_EDGE + k, dummy.matrix);
-      }
+    edges.forEach(([, b], i) => {
+      // Sparks appear once the edge has finished drawing.
+      const drawn = el === Infinity || el > igniteAt(b);
+      const k = (((reducedMotion ? 0 : t) * SPEED + i * 0.137) % 1 + 1) % 1;
+      dummy.position.copy(curves[i].getPoint(k));
+      dummy.scale.setScalar(drawn ? 0.4 + 0.6 * Math.sin(k * Math.PI) : 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
   });
 
   return (
     <group>
-      <lineSegments geometry={base}>
-        <lineBasicMaterial vertexColors transparent opacity={0.25} toneMapped={false} depthWrite={false} />
+      <lineSegments geometry={geometry} frustumCulled={false}>
+        <shaderMaterial
+          ref={material}
+          vertexShader={EDGE_VERTEX}
+          fragmentShader={EDGE_FRAGMENT}
+          uniforms={uniforms}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
       </lineSegments>
-      <lineSegments geometry={active}>
-        <lineBasicMaterial vertexColors transparent opacity={0.9} toneMapped={false} depthWrite={false} />
-      </lineSegments>
-      <instancedMesh ref={particles} args={[undefined, undefined, edges.length * PARTICLES_PER_EDGE]} frustumCulled={false}>
+      <instancedMesh ref={sparks} args={[undefined, undefined, edges.length]} frustumCulled={false}>
         <sphereGeometry args={[0.035, 8, 6]} />
         <meshBasicMaterial toneMapped={false} transparent opacity={0.9} depthWrite={false} />
       </instancedMesh>
