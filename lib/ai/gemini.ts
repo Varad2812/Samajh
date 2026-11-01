@@ -42,7 +42,12 @@ export interface GeminiOptions<S extends z.ZodType> {
   lowThinking?: boolean;
   /** Extra check after zod passes; return a message to reject. */
   verify?: Verify<S>;
+  /** Total time allowed: when the lite model fails early, the main model gets one more try with what is left. */
+  budgetMs?: number;
 }
+
+/** Below this, a last main-model retry cannot finish a long answer. */
+const MIN_RETRY_MS = 12_000;
 
 async function attempt<S extends z.ZodType>(system: string, user: string, schema: S, o: AttemptOptions<S>): Promise<AiResult<z.output<S>>> {
   const { grounded } = o;
@@ -88,7 +93,8 @@ async function attempt<S extends z.ZodType>(system: string, user: string, schema
 /** Grounded call, then plain JSON mode, then the lite model. Never throws; `reason` lists every failure. */
 export async function callGeminiJson<S extends z.ZodType>(system: string, user: string, schema: S, opts: GeminiOptions<S> = {}): Promise<AiResult<z.output<S>>> {
   if (!hasGeminiKey()) return { ok: false, reason: "no-key" };
-  const { grounded = true, timeoutMs = PLAIN_TIMEOUT_MS, liteTimeoutMs = LITE_TIMEOUT_MS, lowThinking = true, verify } = opts;
+  const { grounded = true, timeoutMs = PLAIN_TIMEOUT_MS, liteTimeoutMs = LITE_TIMEOUT_MS, lowThinking = true, verify, budgetMs } = opts;
+  const started = Date.now();
   const failures: string[] = [];
   if (grounded && Date.now() >= groundingBlockedUntil) {
     const r = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: true, timeoutMs: GROUNDED_TIMEOUT_MS, lowThinking: true, verify });
@@ -102,6 +108,12 @@ export async function callGeminiJson<S extends z.ZodType>(system: string, user: 
   const lite = await attempt(system, user, schema, { model: LITE_MODEL, grounded: false, timeoutMs: liteTimeoutMs, lowThinking: false, verify });
   if (lite.ok) return lite;
   failures.push(`lite:${lite.reason}`);
+  const left = budgetMs === undefined ? 0 : budgetMs - (Date.now() - started);
+  if (left >= MIN_RETRY_MS) {
+    const retry = await attempt(system, user, schema, { model: GEMINI_MODEL, grounded: false, timeoutMs: left, lowThinking, verify });
+    if (retry.ok) return retry;
+    failures.push(`retry:${retry.reason}`);
+  }
   return { ok: false, reason: failures.join(",") };
 }
 

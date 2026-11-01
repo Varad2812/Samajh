@@ -17,6 +17,8 @@ async function run(req: CustomTestRequest): Promise<AiEnvelope<CustomTrack | nul
     grounded: false,
     timeoutMs: 40_000,
     liteTimeoutMs: 25_000,
+    // Leaves ~8 s of maxDuration for shaping, logging and the response.
+    budgetMs: 82_000,
     verify: (d) => verifyTrackAI(d, req),
   });
   const track = res.ok ? shapeTrack(req, res.data, id, at) : null;
